@@ -253,19 +253,18 @@ const setup = async () => {
 
   log.info("Provide paths to your audio files for different contexts.");
   log.dim("Supported formats: MP3, WAV, OGG, FLAC, M4A");
-  log.dim(
-    "Files will be automatically converted to WAV (8kHz mono) if needed.\n"
-  );
+  log.dim("Files will be automatically converted to WAV (8kHz mono) if needed.");
+  log.dim("(Leave blank to skip - you can add them later with npm run setup)\n");
 
   const soundContexts = ["coinbase", "apple", "bancocajamar"];
 
   for (const context of soundContexts) {
     log.step(`Setting up sound for context: ${context}`);
 
-    const soundPath = await prompt(`Path to ${context} audio file`);
+    const soundPath = await prompt(`Path to ${context} audio file (or press Enter to skip)`);
 
-    if (!soundPath) {
-      log.warning(`Skipping ${context} - no file provided`);
+    if (!soundPath || soundPath.trim() === "") {
+      log.info(`Skipping ${context} sound for now`);
       continue;
     }
 
@@ -485,14 +484,21 @@ EOF`);
   }
 
   console.log(`\n${colors.bright}Sound Files:${colors.reset}`);
-  for (const [context, soundPath] of Object.entries(setupData.sounds)) {
+  const soundsProvided = Object.keys(setupData.sounds).length;
+
+  if (soundsProvided === 0) {
     console.log(
-      `  ${symbols.check} ${context}: ${colors.green}${soundPath}${colors.reset}`
+      `  ${symbols.info} No sound files configured (0/3) - You can add them later`
     );
+  } else {
+    for (const [context, soundPath] of Object.entries(setupData.sounds)) {
+      console.log(
+        `  ${symbols.check} ${context}: ${colors.green}${soundPath}${colors.reset}`
+      );
+    }
   }
 
-  const soundsProvided = Object.keys(setupData.sounds).length;
-  if (soundsProvided < 3) {
+  if (soundsProvided < 3 && soundsProvided > 0) {
     log.warning(
       `Only ${soundsProvided}/3 sound files configured. You can add more later.`
     );
@@ -546,6 +552,24 @@ EOF`);
   console.log(
     `  ${colors.dim}✓ /etc/asterisk/manager.conf - AMI user${colors.reset}`
   );
+
+  if (soundsProvided > 0) {
+    console.log(`  ${colors.dim}✓ Sound files - Converted and placed${colors.reset}`);
+  }
+
+  log.info("Adding Sound Files Later:");
+  if (soundsProvided < 3) {
+    console.log(`  ${colors.dim}1. Prepare your audio files (MP3, WAV, OGG, FLAC, M4A)${colors.reset}`);
+    console.log(
+      `  ${colors.dim}2. Copy files to: /var/lib/asterisk/sounds/en/${colors.reset}`
+    );
+    console.log(
+      `  ${colors.dim}3. Set permissions: sudo chown asterisk:asterisk /var/lib/asterisk/sounds/en/*.wav${colors.reset}`
+    );
+    console.log(
+      `  ${colors.dim}4. OR run setup again: npm run setup${colors.reset}`
+    );
+  }
 
   log.info("Documentation:");
   console.log(`  ${colors.dim}SETUP_GUIDE.md - Complete setup instructions${colors.reset}`);
