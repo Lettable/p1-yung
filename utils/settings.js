@@ -1,5 +1,6 @@
 let settings = {
   notificationsChatId: null,
+  selectedAudio: "test",
 };
 
 exports.setSettings = (newSettings) => {
