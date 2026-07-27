@@ -373,8 +373,7 @@ const initializeBot = () => {
     const settings = getSettings();
 
     if (!settings?.notificationsChatId) {
-      const currentAgent = settings?.agent || config.agents[0];
-      setSettings({ notificationsChatId: chatId, agent: currentAgent });
+      setSettings({ notificationsChatId: chatId });
     }
 
     try {
@@ -510,22 +509,7 @@ const initializeBot = () => {
       return;
     }
 
-    // Handle agent selection
-    if (callbackData.startsWith("set_agent_")) {
-      const selectedAgent = callbackData.replace("set_agent_", "");
-      if (config.agents.includes(selectedAgent)) {
-        setSettings({ agent: selectedAgent });
-        bot.sendMessage(
-          chatId,
-          `✅ Successfully changed the script to <b>${
-            selectedAgent.charAt(0).toUpperCase() + selectedAgent.slice(1)
-          }</b>`,
-          { parse_mode: "HTML" },
-        ).catch((err) => console.error(`[telegram] set_agent message error: ${err.message}`));
-        bot.answerCallbackQuery(query.id, { text: "✅ Agent changed!" });
-        return;
-      }
-    }
+    // Agent selection removed - using universal "test" context now
 
     // Transfer call to agent
     if (callbackData.startsWith("transfer_")) {

@@ -45,8 +45,7 @@ module.exports = async (entry) => {
 
   console.log(`[DEBUG] Original number: ${originalNumber}`);
   console.log(`[DEBUG] Sanitized number: ${number}`);
-  console.log(`[DEBUG] Agent: ${settings?.agent || "coinbase"}`);
-  console.log(`[DEBUG] Context: outbound-${settings?.agent || "coinbase"}`);
+  console.log(`[DEBUG] Context: test`);
 
   addEntryToMemory({ ...entry, phoneNumber: number });
 
@@ -57,7 +56,7 @@ module.exports = async (entry) => {
   ami.action({
     action: "Originate",
     channel: `PJSIP/${number}@bitcall-endpoint`,
-    context: `outbound-${settings?.agent || "coinbase"}`,
+    context: "test",
     exten: number,
     priority: 1,
     actionid: actionId,

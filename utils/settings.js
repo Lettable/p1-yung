@@ -1,5 +1,4 @@
 let settings = {
-  agent: "coinbase",
   notificationsChatId: null,
 };
 
@@ -17,7 +16,6 @@ exports.getSettings = () => {
   if (!settings) {
     console.error("[settings] Settings object is undefined, returning defaults");
     settings = {
-      agent: "coinbase",
       notificationsChatId: null,
     };
   }
@@ -26,9 +24,6 @@ exports.getSettings = () => {
 
 exports.validateSettings = () => {
   const errors = [];
-  if (!settings.agent) {
-    errors.push("Missing agent setting");
-  }
   if (errors.length > 0) {
     console.warn("[settings] Validation errors:", errors);
     return false;
