@@ -80,6 +80,8 @@ async function startCallingProcess(data) {
 }
 
 // Initialize Telegram Bot
+let userStates = {};
+
 const initializeBot = () => {
   const bot = startBotInstance();
   const adminId = config.creatorTelegramId;
@@ -322,8 +324,6 @@ const initializeBot = () => {
         .catch((err) => console.error(`[telegram] /agents error message failed: ${err.message}`));
     }
   });
-
-  let userStates = {};
 
   bot.on("message", async (msg) => {
     const chatId = msg.chat.id;
@@ -582,7 +582,7 @@ const initializeBot = () => {
       await bot.sendMessage(
         chatId,
         `📱 Current Caller ID: <b>${currentCallerID}</b>\n\n` +
-          "Send a new Caller ID (e.g., +34637183611 or Company Name)",
+          "Send a new Caller ID (your phone number or name)",
         {
           parse_mode: "HTML",
           reply_markup: {
