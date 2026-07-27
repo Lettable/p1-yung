@@ -1,14 +1,17 @@
 const config = {
-  mongodbUri: "",
-  telegramBotToken: "8693999917:AAEfVl5DH-OAqOoPKD3GAnqdrT--tQcc8W0",
-  creatorTelegramId: "7383475549",
+  mongodbUri: "mongodb://mongo:tkAxhQmeXFRzNYivasGxUmqYlFanFwgv@crossover.proxy.rlwy.net:33696/yungp1",
+  telegramBotToken: "8742651661:AAHPwzzQLDG8E0BkZ_onOFl_rKA0Rj3KBWY",
+  creatorTelegramId: "129090875",
   concurrentCalls: 30,
-  agents: ["coinbase", "apple", "bancocajamar"],
   asterisk: {
-    host: "127.0.0.1",
+    host: "185.130.46.72",
     port: 5038,
-    username: "bitcall",
-    password: "Anton123@",
+    username: "yung",
+    password: "yungp1botIsUp@@@@Ff%",
+  },
+  sip: {
+    domain: "gateway.bitcall.io",
+    password: "HAs207933@@",
   },
   fileDownloadTimeout: 30000,
 };
