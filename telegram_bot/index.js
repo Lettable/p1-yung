@@ -13,6 +13,7 @@ const {
   removeActiveCall,
 } = require("../utils/entries");
 const { startBotInstance } = require("./botInstance");
+const audioHandler = require("./audioHandler");
 
 // Helper function to read and parse the file buffer uploaded by the user
 function parseFileData(fileBuffer) {
@@ -110,9 +111,23 @@ const initializeBot = () => {
               callback_data: "set_agent",
             },
           ],
+          [
+            {
+              text: "🔊 View Audios",
+              callback_data: "view_audios",
+            },
+            {
+              text: "➕ Add Audio",
+              callback_data: "add_audio",
+            },
+          ],
         ],
       },
     }).catch((err) => console.error(`[telegram] /start command error: ${err.message}`));
+  });
+
+  // Initialize audio handler
+  audioHandler.setBot(bot);
   });
 
   bot.onText(/\/permit (\d+)/, async (msg, match) => {
@@ -303,6 +318,47 @@ const initializeBot = () => {
     }
   });
 
+  bot.on("message", async (msg) => {
+    const chatId = msg.chat.id;
+    const pendingUploads = audioHandler.getPendingUploads();
+
+    // Handle audio name reply
+    if (
+      pendingUploads[chatId] &&
+      pendingUploads[chatId].stage === "waiting_for_name" &&
+      msg.reply_to_message
+    ) {
+      const audioName = msg.text?.trim();
+      if (audioName) {
+        try {
+          await audioHandler.handleAudioName(chatId, audioName);
+        } catch (err) {
+          console.error(`[telegram] Audio name handler error: ${err.message}`);
+        }
+      }
+    }
+  });
+
+  bot.on("audio", async (msg) => {
+    const chatId = msg.chat.id;
+    const fileId = msg.audio?.file_id;
+
+    if (!fileId) {
+      console.error("[telegram] Audio message missing file_id");
+      bot.sendMessage(chatId, "❌ Invalid audio file")
+        .catch((err) => console.error(`[telegram] audio invalid error: ${err.message}`));
+      return;
+    }
+
+    try {
+      await audioHandler.handleAudioFile(chatId, fileId);
+    } catch (err) {
+      console.error(`[telegram] Audio file handler error: ${err.message}`);
+      bot.sendMessage(chatId, `❌ Error processing audio: ${err.message}`)
+        .catch((e) => console.error(`[telegram] audio error message failed: ${e.message}`));
+    }
+  });
+
   bot.on("document", async (msg) => {
     const chatId = msg.chat.id;
     const fileId = msg.document?.file_id;
@@ -409,6 +465,51 @@ const initializeBot = () => {
   bot.on("callback_query", async (query) => {
     const chatId = query.message.chat.id;
     const callbackData = query.data;
+
+    // Handle audio management callbacks
+    if (callbackData === "add_audio") {
+      try {
+        await audioHandler.handleAddAudioButton(chatId);
+        bot.answerCallbackQuery(query.id, { text: "📤 Upload an audio file" });
+      } catch (err) {
+        console.error(`[telegram] Add audio error: ${err.message}`);
+        bot.answerCallbackQuery(query.id, { text: "❌ Error", show_alert: true });
+      }
+      return;
+    }
+
+    if (callbackData === "view_audios") {
+      try {
+        await audioHandler.handleViewAudiosButton(chatId);
+        bot.answerCallbackQuery(query.id, { text: "🔊 Loading audios..." });
+      } catch (err) {
+        console.error(`[telegram] View audios error: ${err.message}`);
+        bot.answerCallbackQuery(query.id, { text: "❌ Error", show_alert: true });
+      }
+      return;
+    }
+
+    if (callbackData.startsWith("delete_audio:")) {
+      const audioName = callbackData.replace("delete_audio:", "");
+      try {
+        await audioHandler.handleDeleteAudioButton(chatId, audioName);
+        bot.answerCallbackQuery(query.id, { text: "🗑️ Audio deleted" });
+      } catch (err) {
+        console.error(`[telegram] Delete audio error: ${err.message}`);
+        bot.answerCallbackQuery(query.id, { text: "❌ Error", show_alert: true });
+      }
+      return;
+    }
+
+    if (callbackData === "cancel_audio") {
+      try {
+        await audioHandler.handleCancelAudio(chatId);
+        bot.answerCallbackQuery(query.id, { text: "❌ Cancelled" });
+      } catch (err) {
+        console.error(`[telegram] Cancel audio error: ${err.message}`);
+      }
+      return;
+    }
 
     // Handle agent selection
     if (callbackData.startsWith("set_agent_")) {
