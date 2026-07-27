@@ -1,6 +1,7 @@
 let settings = {
   notificationsChatId: null,
   selectedAudio: "test",
+  callerID: null,
 };
 
 exports.setSettings = (newSettings) => {
@@ -18,6 +19,8 @@ exports.getSettings = () => {
     console.error("[settings] Settings object is undefined, returning defaults");
     settings = {
       notificationsChatId: null,
+      selectedAudio: "test",
+      callerID: null,
     };
   }
   return settings;

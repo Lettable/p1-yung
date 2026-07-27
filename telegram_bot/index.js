@@ -121,6 +121,12 @@ const initializeBot = () => {
               callback_data: "add_audio",
             },
           ],
+          [
+            {
+              text: "📱 Set Caller ID",
+              callback_data: "set_caller_id",
+            },
+          ],
         ],
       },
     }).catch((err) => console.error(`[telegram] /start command error: ${err.message}`));
@@ -317,9 +323,26 @@ const initializeBot = () => {
     }
   });
 
+  let userStates = {};
+
   bot.on("message", async (msg) => {
     const chatId = msg.chat.id;
     const pendingUploads = audioHandler.getPendingUploads();
+
+    // Handle Caller ID reply
+    if (userStates[chatId] && userStates[chatId].screen === "awaiting_caller_id" && msg.reply_to_message) {
+      const newCallerID = msg.text?.trim();
+      if (newCallerID) {
+        setSettings({ callerID: newCallerID });
+        await bot.sendMessage(
+          chatId,
+          `✅ Caller ID updated to: <b>${newCallerID}</b>`,
+          { parse_mode: "HTML" }
+        ).catch((err) => console.error(`[telegram] Caller ID set message error: ${err.message}`));
+        delete userStates[chatId];
+      }
+      return;
+    }
 
     // Handle audio name reply
     if (
@@ -551,6 +574,24 @@ const initializeBot = () => {
       } catch (err) {
         console.error(`[telegram] Cancel audio error: ${err.message}`);
       }
+      return;
+    }
+
+    if (callbackData === "set_caller_id") {
+      const currentCallerID = getSettings()?.callerID || "Not set";
+      await bot.sendMessage(
+        chatId,
+        `📱 Current Caller ID: <b>${currentCallerID}</b>\n\n` +
+          "Send a new Caller ID (e.g., +34637183611 or Company Name)",
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            force_reply: true,
+            selective: true,
+          },
+        }
+      ).catch((err) => console.error(`[telegram] Set caller ID message error: ${err.message}`));
+      bot.answerCallbackQuery(query.id);
       return;
     }
 
