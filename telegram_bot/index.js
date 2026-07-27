@@ -687,17 +687,7 @@ const initializeBot = () => {
       case "set_agent":
         bot.sendMessage(
           chatId,
-          "Please choose one of the following agents below:",
-          {
-            reply_markup: {
-              inline_keyboard: config.agents.map((agent) => [
-                {
-                  text: `👤 ${agent.charAt(0).toUpperCase() + agent.slice(1)}`,
-                  callback_data: `set_agent_${agent}`,
-                },
-              ]),
-            },
-          },
+          "ℹ️ The system now uses a universal test context for all calls.\n\nTo customize audio, use the 🔊 View Audios and ➕ Add Audio buttons to manage your audio files.",
         ).catch((err) => console.error(`[telegram] set_agent message error: ${err.message}`));
         break;
     }
