@@ -88,28 +88,14 @@ const commandExists = (command) => {
   }
 };
 
-// Detect audio file format
-const detectAudioFormat = (filePath) => {
-  const ext = path.extname(filePath).toLowerCase();
-  const mimeTypes = {
-    ".mp3": "mp3",
-    ".wav": "wav",
-    ".alaw": "alaw",
-    ".ulaw": "ulaw",
-    ".gsm": "gsm",
-    ".ogg": "ogg",
-    ".flac": "flac",
-    ".m4a": "aac",
-  };
-  return mimeTypes[ext] || "unknown";
-};
-
-// Convert audio file to WAV format
-const convertToWav = async (inputPath, outputPath) => {
+// Generate beep sound using ffmpeg
+const generateBeepSound = (outputPath, frequency = 1000, duration = 0.5) => {
   return new Promise((resolve, reject) => {
     const ffmpeg = spawn("ffmpeg", [
+      "-f",
+      "lavfi",
       "-i",
-      inputPath,
+      `sine=frequency=${frequency}:duration=${duration}`,
       "-ar",
       "8000",
       "-ac",
@@ -126,7 +112,7 @@ const convertToWav = async (inputPath, outputPath) => {
       if (code === 0) {
         resolve(true);
       } else {
-        reject(new Error(`FFmpeg conversion failed with code ${code}`));
+        reject(new Error(`FFmpeg beep generation failed with code ${code}`));
       }
     });
 
@@ -151,6 +137,7 @@ const setup = async () => {
     mongodb: {},
     telegram: {},
     asterisk: {},
+    sip: {},
     sounds: {},
     dependencies: {},
   };
@@ -248,37 +235,40 @@ const setup = async () => {
   log.dim(`  Username: ${setupData.asterisk.username}`);
   log.dim(`  Password: ${"*".repeat(setupData.asterisk.password.length)}`);
 
-  // Step 5: Sound Files Configuration
-  log.header("Step 5: Sound Files Configuration");
+  // Step 5: SIP Configuration
+  log.header("Step 5: SIP Configuration");
 
-  log.info("Provide paths to your audio files for different contexts.");
-  log.dim("Supported formats: MP3, WAV, OGG, FLAC, M4A");
-  log.dim("Files will be automatically converted to WAV (8kHz mono) if needed.");
-  log.dim("(Leave blank to skip - you can add them later with npm run setup)\n");
+  log.info("Configure your SIP gateway/peer details.");
 
-  const soundContexts = ["coinbase", "apple", "bancocajamar"];
+  setupData.sip.domain = await prompt("Enter SIP Domain or IP (e.g., gateway.example.com or 192.168.1.1)");
+  if (!setupData.sip.domain) {
+    log.error("SIP Domain/IP is required");
+    process.exit(1);
+  }
 
-  for (const context of soundContexts) {
-    log.step(`Setting up sound for context: ${context}`);
+  setupData.sip.password = await prompt("Enter SIP Password");
+  if (!setupData.sip.password) {
+    log.error("SIP Password is required");
+    process.exit(1);
+  }
 
-    const soundPath = await prompt(`Path to ${context} audio file (or press Enter to skip)`);
+  log.success("SIP configuration saved");
+  log.dim(`  Domain/IP: ${setupData.sip.domain}`);
+  log.dim(`  Password: ${"*".repeat(setupData.sip.password.length)}`);
 
-    if (!soundPath || soundPath.trim() === "") {
-      log.info(`Skipping ${context} sound for now`);
-      continue;
-    }
+  // Step 6: Auto-Generate Test Beep Sounds
+  log.header("Step 6: Generating Test Beep Sounds");
 
-    if (!fs.existsSync(soundPath)) {
-      log.error(`File not found: ${soundPath}`);
-      continue;
-    }
-
-    const format = detectAudioFormat(soundPath);
-    log.info(`Detected format: ${format}`);
-
+  if (!commandExists("ffmpeg")) {
+    log.warning("ffmpeg not found. Install it with: sudo apt install ffmpeg");
+    log.info("Skipping sound file generation.");
+  } else {
     const asteriskSoundDir = `/var/lib/asterisk/sounds/en/`;
-    const outputFileName = `${context}.wav`;
-    const outputPath = path.join(asteriskSoundDir, outputFileName);
+    const soundContexts = [
+      { name: "coinbase", freq: 1000 },
+      { name: "apple", freq: 800 },
+      { name: "bancocajamar", freq: 600 },
+    ];
 
     try {
       // Create Asterisk sounds directory if it doesn't exist
@@ -287,45 +277,29 @@ const setup = async () => {
         log.info(`Created directory: ${asteriskSoundDir}`);
       }
 
-      if (format === "wav") {
-        // Copy WAV file directly
-        execSync(`sudo cp "${soundPath}" "${outputPath}"`);
-        log.success(`${context} sound copied to ${outputPath}`);
-      } else if (format === "unknown") {
-        log.error(
-          `Unknown audio format for ${context}. Please use: MP3, WAV, OGG, FLAC, or M4A`
-        );
-        continue;
-      } else {
-        // Check if ffmpeg is available
-        if (!commandExists("ffmpeg")) {
-          log.warning("ffmpeg not found. Install it with: sudo apt install ffmpeg");
-          log.info("For now, please manually convert your audio files to WAV format.");
-          continue;
+      for (const context of soundContexts) {
+        log.step(`Generating ${context.name} beep sound...`);
+        const tempPath = path.join("/tmp", `${context.name}_beep.wav`);
+        const outputPath = path.join(asteriskSoundDir, `${context.name}.wav`);
+
+        try {
+          await generateBeepSound(tempPath, context.freq, 1.0);
+          execSync(`sudo mv "${tempPath}" "${outputPath}"`);
+          execSync(`sudo chown asterisk:asterisk "${outputPath}"`);
+          execSync(`sudo chmod 644 "${outputPath}"`);
+          log.success(`${context.name} beep sound generated`);
+          setupData.sounds[context.name] = outputPath;
+        } catch (err) {
+          log.error(`Failed to generate ${context.name} beep: ${err.message}`);
         }
-
-        // Convert to WAV
-        log.step(`Converting ${context} audio to WAV format...`);
-        const tempPath = path.join("/tmp", `${context}_temp.wav`);
-
-        await convertToWav(soundPath, tempPath);
-        execSync(`sudo mv "${tempPath}" "${outputPath}"`);
-
-        log.success(`${context} sound converted and placed at ${outputPath}`);
       }
-
-      // Set proper permissions
-      execSync(`sudo chown asterisk:asterisk "${outputPath}"`);
-      execSync(`sudo chmod 644 "${outputPath}"`);
-
-      setupData.sounds[context] = outputPath;
     } catch (err) {
-      log.error(`Failed to process ${context} sound: ${err.message}`);
+      log.error(`Sound generation failed: ${err.message}`);
     }
   }
 
-  // Step 6: Update Configuration Files
-  log.header("Step 6: Updating Configuration Files");
+  // Step 7: Update Configuration Files
+  log.header("Step 7: Updating Configuration Files");
 
   try {
     log.step("Updating config/index.js...");
@@ -341,6 +315,10 @@ const setup = async () => {
     port: ${setupData.asterisk.port},
     username: "${setupData.asterisk.username}",
     password: "${setupData.asterisk.password}",
+  },
+  sip: {
+    domain: "${setupData.sip.domain}",
+    password: "${setupData.sip.password}",
   },
   fileDownloadTimeout: 30000,
 };
@@ -364,6 +342,10 @@ ASTERISK_HOST=${setupData.asterisk.host}
 ASTERISK_PORT=${setupData.asterisk.port}
 ASTERISK_USERNAME=${setupData.asterisk.username}
 ASTERISK_PASSWORD=${setupData.asterisk.password}
+
+# SIP Configuration
+SIP_DOMAIN=${setupData.sip.domain}
+SIP_PASSWORD=${setupData.sip.password}
 
 # Application Configuration
 NODE_ENV=production
@@ -431,8 +413,8 @@ EOF`);
     log.error(`Failed to update config: ${err.message}`);
   }
 
-  // Step 7: Install Dependencies
-  log.header("Step 7: Installing Dependencies");
+  // Step 8: Install Dependencies
+  log.header("Step 8: Installing Dependencies");
 
   try {
     log.step("Running npm install...");
@@ -444,136 +426,58 @@ EOF`);
     setupData.dependencies.installed = false;
   }
 
-  // Step 8: Summary
+  // Step 9: Summary
   log.header("✨ Setup Summary");
 
-  console.log(`\n${colors.bright}MongoDB Configuration:${colors.reset}`);
-  console.log(
-    `  ${symbols.check} URI: ${colors.green}${setupData.mongodb.uri}${colors.reset}`
-  );
+  console.log(`
+${colors.bright}MongoDB Configuration:${colors.reset}
+  ${symbols.check} URI: ${setupData.mongodb.uri}
 
-  console.log(`\n${colors.bright}Telegram Bot Configuration:${colors.reset}`);
-  console.log(
-    `  ${symbols.check} Token: ${colors.green}${setupData.telegram.token.substring(0, 20)}...${colors.reset}`
-  );
-  console.log(
-    `  ${symbols.check} Admin ID: ${colors.green}${setupData.telegram.creatorId}${colors.reset}`
-  );
+${colors.bright}Telegram Bot Configuration:${colors.reset}
+  ${symbols.check} Token: ${setupData.telegram.token.substring(0, 20)}...
+  ${symbols.check} Admin ID: ${setupData.telegram.creatorId}
 
-  console.log(`\n${colors.bright}Asterisk Configuration:${colors.reset}`);
-  console.log(
-    `  ${symbols.check} Host: ${colors.green}${setupData.asterisk.host}${colors.reset}`
-  );
-  console.log(
-    `  ${symbols.check} Port: ${colors.green}${setupData.asterisk.port}${colors.reset}`
-  );
-  console.log(
-    `  ${symbols.check} AMI Username: ${colors.green}${setupData.asterisk.username}${colors.reset}`
-  );
-  console.log(
-    `  ${symbols.check} AMI Password: ${colors.green}${"*".repeat(setupData.asterisk.password.length)}${colors.reset}`
-  );
-  if (setupData.asterisk.managerConfConfigured) {
-    console.log(
-      `  ${symbols.check} manager.conf: ${colors.green}Auto-configured${colors.reset}`
-    );
-  } else {
-    console.log(
-      `  ${symbols.warning} manager.conf: ${colors.yellow}Manual setup needed${colors.reset}`
-    );
-  }
+${colors.bright}Asterisk Configuration:${colors.reset}
+  ${symbols.check} Host: ${setupData.asterisk.host}
+  ${symbols.check} Port: ${setupData.asterisk.port}
+  ${symbols.check} AMI Username: ${setupData.asterisk.username}
+  ${symbols.check} AMI Password: ${"*".repeat(setupData.asterisk.password.length)}
 
-  console.log(`\n${colors.bright}Sound Files:${colors.reset}`);
-  const soundsProvided = Object.keys(setupData.sounds).length;
+${colors.bright}SIP Configuration:${colors.reset}
+  ${symbols.check} Domain/IP: ${setupData.sip.domain}
+  ${symbols.check} Password: ${"*".repeat(setupData.sip.password.length)}
 
-  if (soundsProvided === 0) {
-    console.log(
-      `  ${symbols.info} No sound files configured (0/3) - You can add them later`
-    );
-  } else {
-    for (const [context, soundPath] of Object.entries(setupData.sounds)) {
-      console.log(
-        `  ${symbols.check} ${context}: ${colors.green}${soundPath}${colors.reset}`
-      );
-    }
-  }
+${colors.bright}Sound Files:${colors.reset}
+  ${symbols.check} Auto-generated test beep sounds (${Object.keys(setupData.sounds).length}/3)
 
-  if (soundsProvided < 3 && soundsProvided > 0) {
-    log.warning(
-      `Only ${soundsProvided}/3 sound files configured. You can add more later.`
-    );
-  }
+${colors.bright}Dependencies:${colors.reset}
+  ${symbols.check} npm packages: Installed
+  `);
 
-  console.log(`\n${colors.bright}Dependencies:${colors.reset}`);
-  if (setupData.dependencies.installed) {
-    console.log(
-      `  ${symbols.check} npm packages: ${colors.green}Installed${colors.reset}`
-    );
-  } else {
-    console.log(
-      `  ${symbols.cross} npm packages: ${colors.red}Failed${colors.reset}`
-    );
-    log.info("Run 'npm install' manually to install dependencies.");
-  }
-
-  // Final instructions
   log.header("🎉 Setup Complete!");
 
   log.warning("IMPORTANT - Security:");
-  console.log(
-    `  ${colors.red}${symbols.warning} Keep .env file safe - it contains your credentials${colors.reset}`
-  );
-  console.log(
-    `  ${colors.red}${symbols.warning} Add .env to .gitignore (never commit credentials)${colors.reset}`
-  );
-  console.log(
-    `  ${colors.red}${symbols.warning} Your Asterisk AMI user is now created${colors.reset}\n`
-  );
+  log.dim("  ⚠ Keep .env file safe - it contains your credentials");
+  log.dim("  ⚠ Add .env to .gitignore (never commit credentials)");
+  log.dim("  ⚠ Your Asterisk AMI user is now created");
 
   log.info("Next steps:");
-  console.log(
-    `  1. ${colors.dim}Verify Asterisk manager.conf was created/updated${colors.reset}`
-  );
-  console.log(
-    `  2. ${colors.dim}Verify Asterisk extensions.conf at: /etc/asterisk/extensions.conf${colors.reset}`
-  );
-  console.log(
-    `  3. ${colors.dim}Start your bot with: npm run dev${colors.reset}`
-  );
-  console.log(
-    `  4. ${colors.dim}Test the bot by sending a file to your Telegram bot${colors.reset}`
-  );
+  log.dim("  1. Verify Asterisk manager.conf was created/updated");
+  log.dim("  2. Verify Asterisk extensions.conf at: /etc/asterisk/extensions.conf");
+  log.dim("  3. Start your bot with: npm run dev");
+  log.dim("  4. Test the bot by sending a file to your Telegram bot");
 
   log.info("Files created/updated:");
-  console.log(`  ${colors.dim}✓ config/index.js - Configuration${colors.reset}`);
-  console.log(
-    `  ${colors.dim}✓ .env - Credentials (DO NOT COMMIT TO GIT)${colors.reset}`
-  );
-  console.log(
-    `  ${colors.dim}✓ /etc/asterisk/manager.conf - AMI user${colors.reset}`
-  );
-
-  if (soundsProvided > 0) {
-    console.log(`  ${colors.dim}✓ Sound files - Converted and placed${colors.reset}`);
-  }
-
-  log.info("Adding Sound Files Later:");
-  if (soundsProvided < 3) {
-    console.log(`  ${colors.dim}1. Prepare your audio files (MP3, WAV, OGG, FLAC, M4A)${colors.reset}`);
-    console.log(
-      `  ${colors.dim}2. Copy files to: /var/lib/asterisk/sounds/en/${colors.reset}`
-    );
-    console.log(
-      `  ${colors.dim}3. Set permissions: sudo chown asterisk:asterisk /var/lib/asterisk/sounds/en/*.wav${colors.reset}`
-    );
-    console.log(
-      `  ${colors.dim}4. OR run setup again: npm run setup${colors.reset}`
-    );
-  }
+  log.dim("  ✓ config/index.js - Configuration");
+  log.dim("  ✓ .env - Credentials (DO NOT COMMIT TO GIT)");
+  log.dim("  ✓ /etc/asterisk/manager.conf - AMI user");
+  log.dim("  ✓ /var/lib/asterisk/sounds/en/coinbase.wav - Test beep");
+  log.dim("  ✓ /var/lib/asterisk/sounds/en/apple.wav - Test beep");
+  log.dim("  ✓ /var/lib/asterisk/sounds/en/bancocajamar.wav - Test beep");
 
   log.info("Documentation:");
-  console.log(`  ${colors.dim}SETUP_GUIDE.md - Complete setup instructions${colors.reset}`);
-  console.log(`  ${colors.dim}QUICK_REFERENCE.md - Command cheat sheet${colors.reset}`);
+  log.dim("  SETUP_GUIDE.md - Complete setup instructions");
+  log.dim("  QUICK_REFERENCE.md - Command cheat sheet");
 
   console.log();
 };
