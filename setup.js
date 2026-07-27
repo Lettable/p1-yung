@@ -206,24 +206,47 @@ const setup = async () => {
   log.header("Step 4: Asterisk Configuration");
 
   log.info("Configure your Asterisk server details.");
+  log.dim(
+    "This will create an AMI (Asterisk Manager Interface) user for the bot to make calls.\n"
+  );
 
-  setupData.asterisk.host = await prompt("Asterisk host (default: 127.0.0.1)");
-  setupData.asterisk.host = setupData.asterisk.host || "127.0.0.1";
+  setupData.asterisk.host = await prompt("Asterisk host (e.g., 127.0.0.1)");
+  if (!setupData.asterisk.host) {
+    log.error("Asterisk host is required");
+    process.exit(1);
+  }
 
-  setupData.asterisk.port = await prompt("Asterisk AMI port (default: 5038)");
-  setupData.asterisk.port = setupData.asterisk.port || "5038";
+  setupData.asterisk.port = await prompt("Asterisk AMI port (e.g., 5038)");
+  if (!setupData.asterisk.port) {
+    log.error("Asterisk port is required");
+    process.exit(1);
+  }
+
+  log.info("Creating new AMI user for the bot...");
 
   setupData.asterisk.username = await prompt(
-    "Asterisk AMI username (default: bitcall)"
+    "Choose AMI username (e.g., asterisk_bot)"
   );
-  setupData.asterisk.username = setupData.asterisk.username || "bitcall";
+  if (!setupData.asterisk.username) {
+    log.error("AMI username is required");
+    process.exit(1);
+  }
 
   setupData.asterisk.password = await prompt(
-    "Asterisk AMI password (default: Anton123@)"
+    "Choose AMI password (strong password recommended)"
   );
-  setupData.asterisk.password = setupData.asterisk.password || "Anton123@";
+  if (!setupData.asterisk.password) {
+    log.error("AMI password is required");
+    process.exit(1);
+  }
 
-  log.success("Asterisk configuration saved");
+  if (setupData.asterisk.password.length < 8) {
+    log.warning("Password is short - consider using a stronger password");
+  }
+
+  log.success("Asterisk AMI user will be created with:");
+  log.dim(`  Username: ${setupData.asterisk.username}`);
+  log.dim(`  Password: ${"*".repeat(setupData.asterisk.password.length)}`);
 
   // Step 5: Sound Files Configuration
   log.header("Step 5: Sound Files Configuration");
@@ -326,6 +349,85 @@ const setup = async () => {
 
     fs.writeFileSync(path.join(__dirname, "config/index.js"), configTemplate);
     log.success("config/index.js updated");
+
+    // Create .env file with sensitive data
+    log.step("Creating .env file...");
+
+    const envTemplate = `# MongoDB Configuration
+MONGODB_URI=${setupData.mongodb.uri}
+
+# Telegram Bot Configuration
+TELEGRAM_BOT_TOKEN=${setupData.telegram.token}
+TELEGRAM_ADMIN_ID=${setupData.telegram.creatorId}
+
+# Asterisk Configuration
+ASTERISK_HOST=${setupData.asterisk.host}
+ASTERISK_PORT=${setupData.asterisk.port}
+ASTERISK_USERNAME=${setupData.asterisk.username}
+ASTERISK_PASSWORD=${setupData.asterisk.password}
+
+# Application Configuration
+NODE_ENV=production
+CONCURRENT_CALLS=30
+FILE_DOWNLOAD_TIMEOUT=30000
+
+# Logging
+LOG_LEVEL=info
+`;
+
+    fs.writeFileSync(path.join(__dirname, ".env"), envTemplate);
+    log.success(".env file created (keep this safe!)");
+
+    // Create/update Asterisk manager.conf
+    log.step("Setting up Asterisk manager.conf...");
+
+    const managerConfTemplate = `[general]
+enabled = yes
+port = ${setupData.asterisk.port}
+bindaddr = 0.0.0.0
+tlsenable = no
+
+[${setupData.asterisk.username}]
+secret = ${setupData.asterisk.password}
+read = all
+write = all
+`;
+
+    const asteriskConfigDir = "/etc/asterisk";
+    const managerConfPath = path.join(asteriskConfigDir, "manager.conf");
+
+    try {
+      // Check if running on Linux with Asterisk
+      if (process.platform === "linux" && fs.existsSync(asteriskConfigDir)) {
+        try {
+          execSync(`sudo tee ${managerConfPath} > /dev/null << 'EOF'
+${managerConfTemplate}
+EOF`);
+
+          execSync("sudo asterisk -rx 'manager reload'");
+          log.success("Asterisk manager.conf configured and reloaded");
+          setupData.asterisk.managerConfConfigured = true;
+        } catch (err) {
+          log.warning(
+            "Could not auto-configure manager.conf. Manual setup needed:"
+          );
+          log.dim(`\nRun: sudo nano /etc/asterisk/manager.conf`);
+          log.dim("Add this section:");
+          console.log(managerConfTemplate);
+          setupData.asterisk.managerConfConfigured = false;
+        }
+      } else if (process.platform !== "linux") {
+        log.info(
+          "Not on Linux - manual Asterisk setup will be needed on your server"
+        );
+        setupData.asterisk.managerConfConfigured = false;
+      }
+    } catch (err) {
+      log.warning(
+        `Could not auto-configure manager.conf: ${err.message}`
+      );
+      setupData.asterisk.managerConfConfigured = false;
+    }
   } catch (err) {
     log.error(`Failed to update config: ${err.message}`);
   }
@@ -367,8 +469,20 @@ const setup = async () => {
     `  ${symbols.check} Port: ${colors.green}${setupData.asterisk.port}${colors.reset}`
   );
   console.log(
-    `  ${symbols.check} Username: ${colors.green}${setupData.asterisk.username}${colors.reset}`
+    `  ${symbols.check} AMI Username: ${colors.green}${setupData.asterisk.username}${colors.reset}`
   );
+  console.log(
+    `  ${symbols.check} AMI Password: ${colors.green}${"*".repeat(setupData.asterisk.password.length)}${colors.reset}`
+  );
+  if (setupData.asterisk.managerConfConfigured) {
+    console.log(
+      `  ${symbols.check} manager.conf: ${colors.green}Auto-configured${colors.reset}`
+    );
+  } else {
+    console.log(
+      `  ${symbols.warning} manager.conf: ${colors.yellow}Manual setup needed${colors.reset}`
+    );
+  }
 
   console.log(`\n${colors.bright}Sound Files:${colors.reset}`);
   for (const [context, soundPath] of Object.entries(setupData.sounds)) {
@@ -399,19 +513,43 @@ const setup = async () => {
   // Final instructions
   log.header("🎉 Setup Complete!");
 
+  log.warning("IMPORTANT - Security:");
+  console.log(
+    `  ${colors.red}${symbols.warning} Keep .env file safe - it contains your credentials${colors.reset}`
+  );
+  console.log(
+    `  ${colors.red}${symbols.warning} Add .env to .gitignore (never commit credentials)${colors.reset}`
+  );
+  console.log(
+    `  ${colors.red}${symbols.warning} Your Asterisk AMI user is now created${colors.reset}\n`
+  );
+
   log.info("Next steps:");
   console.log(
-    `  1. ${colors.dim}Verify Asterisk configuration at: /etc/asterisk/extensions.conf${colors.reset}`
+    `  1. ${colors.dim}Verify Asterisk manager.conf was created/updated${colors.reset}`
   );
   console.log(
-    `  2. ${colors.dim}Start your bot with: npm run dev${colors.reset}`
+    `  2. ${colors.dim}Verify Asterisk extensions.conf at: /etc/asterisk/extensions.conf${colors.reset}`
   );
   console.log(
-    `  3. ${colors.dim}Test the bot by sending a file to your Telegram bot${colors.reset}`
+    `  3. ${colors.dim}Start your bot with: npm run dev${colors.reset}`
+  );
+  console.log(
+    `  4. ${colors.dim}Test the bot by sending a file to your Telegram bot${colors.reset}`
+  );
+
+  log.info("Files created/updated:");
+  console.log(`  ${colors.dim}✓ config/index.js - Configuration${colors.reset}`);
+  console.log(
+    `  ${colors.dim}✓ .env - Credentials (DO NOT COMMIT TO GIT)${colors.reset}`
+  );
+  console.log(
+    `  ${colors.dim}✓ /etc/asterisk/manager.conf - AMI user${colors.reset}`
   );
 
   log.info("Documentation:");
-  console.log(`  ${colors.dim}https://github.com/your-repo/wiki${colors.reset}`);
+  console.log(`  ${colors.dim}SETUP_GUIDE.md - Complete setup instructions${colors.reset}`);
+  console.log(`  ${colors.dim}QUICK_REFERENCE.md - Command cheat sheet${colors.reset}`);
 
   console.log();
 };
