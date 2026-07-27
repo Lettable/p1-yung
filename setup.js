@@ -256,19 +256,14 @@ const setup = async () => {
   log.dim(`  Domain/IP: ${setupData.sip.domain}`);
   log.dim(`  Password: ${"*".repeat(setupData.sip.password.length)}`);
 
-  // Step 6: Auto-Generate Test Beep Sounds
-  log.header("Step 6: Generating Test Beep Sounds");
+  // Step 6: Auto-Generate Universal Test Beep Sound
+  log.header("Step 6: Generating Universal Test Beep Sound");
 
   if (!commandExists("ffmpeg")) {
     log.warning("ffmpeg not found. Install it with: sudo apt install ffmpeg");
     log.info("Skipping sound file generation.");
   } else {
     const asteriskSoundDir = `/var/lib/asterisk/sounds/en/`;
-    const soundContexts = [
-      { name: "coinbase", freq: 1000 },
-      { name: "apple", freq: 800 },
-      { name: "bancocajamar", freq: 600 },
-    ];
 
     try {
       // Create Asterisk sounds directory if it doesn't exist
@@ -277,21 +272,26 @@ const setup = async () => {
         log.info(`Created directory: ${asteriskSoundDir}`);
       }
 
-      for (const context of soundContexts) {
-        log.step(`Generating ${context.name} beep sound...`);
-        const tempPath = path.join("/tmp", `${context.name}_beep.wav`);
-        const outputPath = path.join(asteriskSoundDir, `${context.name}.wav`);
+      log.step("Generating universal test beep sound...");
+      const tempPath = path.join("/tmp", "test_beep.wav");
+      const outputPath = path.join(asteriskSoundDir, "test_beep.wav");
 
+      try {
+        await generateBeepSound(tempPath, 1000, 1.0);
+        execSync(`sudo mv "${tempPath}" "${outputPath}"`);
+
+        // Try to set permissions - skip if asterisk user doesn't exist
         try {
-          await generateBeepSound(tempPath, context.freq, 1.0);
-          execSync(`sudo mv "${tempPath}" "${outputPath}"`);
           execSync(`sudo chown asterisk:asterisk "${outputPath}"`);
-          execSync(`sudo chmod 644 "${outputPath}"`);
-          log.success(`${context.name} beep sound generated`);
-          setupData.sounds[context.name] = outputPath;
-        } catch (err) {
-          log.error(`Failed to generate ${context.name} beep: ${err.message}`);
+        } catch {
+          log.dim("  (asterisk user not found locally - permissions set to root)");
         }
+
+        execSync(`sudo chmod 644 "${outputPath}"`);
+        log.success("Universal test beep generated: test_beep.wav");
+        setupData.sounds.test = outputPath;
+      } catch (err) {
+        log.error(`Failed to generate beep: ${err.message}`);
       }
     } catch (err) {
       log.error(`Sound generation failed: ${err.message}`);
@@ -309,7 +309,6 @@ const setup = async () => {
   telegramBotToken: "${setupData.telegram.token}",
   creatorTelegramId: "${setupData.telegram.creatorId}",
   concurrentCalls: 30,
-  agents: ["coinbase", "apple", "bancocajamar"],
   asterisk: {
     host: "${setupData.asterisk.host}",
     port: ${setupData.asterisk.port},
@@ -448,7 +447,7 @@ ${colors.bright}SIP Configuration:${colors.reset}
   ${symbols.check} Password: ${"*".repeat(setupData.sip.password.length)}
 
 ${colors.bright}Sound Files:${colors.reset}
-  ${symbols.check} Auto-generated test beep sounds (${Object.keys(setupData.sounds).length}/3)
+  ${symbols.check} Universal test beep: test_beep.wav (${Object.keys(setupData.sounds).length}/1)
 
 ${colors.bright}Dependencies:${colors.reset}
   ${symbols.check} npm packages: Installed
@@ -471,9 +470,7 @@ ${colors.bright}Dependencies:${colors.reset}
   log.dim("  ✓ config/index.js - Configuration");
   log.dim("  ✓ .env - Credentials (DO NOT COMMIT TO GIT)");
   log.dim("  ✓ /etc/asterisk/manager.conf - AMI user");
-  log.dim("  ✓ /var/lib/asterisk/sounds/en/coinbase.wav - Test beep");
-  log.dim("  ✓ /var/lib/asterisk/sounds/en/apple.wav - Test beep");
-  log.dim("  ✓ /var/lib/asterisk/sounds/en/bancocajamar.wav - Test beep");
+  log.dim("  ✓ /var/lib/asterisk/sounds/en/test_beep.wav - Universal test beep");
 
   log.info("Documentation:");
   log.dim("  SETUP_GUIDE.md - Complete setup instructions");
