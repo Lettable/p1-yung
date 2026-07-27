@@ -4,6 +4,7 @@ const axios = require("axios");
 const config = require("../config");
 const Audio = require("../models/Audio");
 const { saveAudio, deleteAudio, getAudioList } = require("../utils/audioManager");
+const { updateExtensionsConf } = require("../utils/extensionsGenerator");
 
 let bot;
 let pendingAudioUploads = {};
@@ -140,7 +141,15 @@ const handleDeleteAudioButton = async (chatId, audioName) => {
     const deleted = await deleteAudio(audioName);
 
     if (deleted) {
-      await bot.sendMessage(chatId, `✅ Audio "${audioName}" deleted!`);
+      // Regenerate extensions.conf after deletion
+      try {
+        const allAudios = await getAudioList();
+        await updateExtensionsConf(allAudios);
+      } catch (err) {
+        console.error(`[audioHandler] Failed to regenerate extensions: ${err.message}`);
+      }
+
+      await bot.sendMessage(chatId, `✅ Audio "${audioName}" deleted!\n📝 Extension [${audioName}] removed`);
 
       // Refresh audio list
       const audios = await getAudioList();
@@ -349,11 +358,19 @@ const handleAudioName = async (chatId, audioName) => {
       // Temp file might not exist
     }
 
+    // Regenerate extensions.conf
+    try {
+      const allAudios = await getAudioList();
+      await updateExtensionsConf(allAudios);
+    } catch (err) {
+      console.error(`[audioHandler] Failed to regenerate extensions: ${err.message}`);
+    }
+
     delete pendingAudioUploads[chatId];
 
     await bot.sendMessage(
       chatId,
-      `✅ Audio "${audioName}" saved!\n\n📊 Size: ${(audio.size / 1024).toFixed(2)} KB`,
+      `✅ Audio "${audioName}" saved!\n\n📊 Size: ${(audio.size / 1024).toFixed(2)} KB\n📝 Extension [${audioName}] created`,
       {
         parse_mode: "Markdown",
         reply_markup: {
