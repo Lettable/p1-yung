@@ -338,6 +338,7 @@ const setup = async () => {
   telegramBotToken: "${setupData.telegram.token}",
   creatorTelegramId: "${setupData.telegram.creatorId}",
   concurrentCalls: 30,
+  callContext: "test",
   asterisk: {
     host: "${setupData.asterisk.host}",
     port: ${setupData.asterisk.port},
@@ -436,6 +437,50 @@ EOF`);
         `Could not auto-configure manager.conf: ${err.message}`
       );
       setupData.asterisk.managerConfConfigured = false;
+    }
+
+    // Create/update Asterisk extensions.conf with test context
+    log.step("Setting up Asterisk extensions.conf...");
+
+    const extensionsConfTemplate = `[general]
+static=yes
+writeprotect=no
+
+[test]
+exten => _X.,1,Answer()
+exten => _X.,n,Progress()
+exten => _X.,n,Playback(test_beep)
+exten => _X.,n,Wait(60)
+exten => _X.,n,Hangup()
+`;
+
+    const extensionsConfPath = path.join(asteriskConfigDir, "extensions.conf");
+
+    try {
+      if (process.platform === "linux" && fs.existsSync(asteriskConfigDir)) {
+        try {
+          execSync(`sudo tee ${extensionsConfPath} > /dev/null << 'EOF'
+${extensionsConfTemplate}
+EOF`);
+
+          execSync("sudo asterisk -rx 'dialplan reload'");
+          log.success("Asterisk extensions.conf configured and reloaded");
+          setupData.asterisk.extensionsConfConfigured = true;
+        } catch (err) {
+          log.warning(
+            "Could not auto-configure extensions.conf. Manual setup needed:"
+          );
+          log.dim(`\nRun: sudo nano /etc/asterisk/extensions.conf`);
+          log.dim("Add this section:");
+          console.log(extensionsConfTemplate);
+          setupData.asterisk.extensionsConfConfigured = false;
+        }
+      }
+    } catch (err) {
+      log.warning(
+        `Could not auto-configure extensions.conf: ${err.message}`
+      );
+      setupData.asterisk.extensionsConfConfigured = false;
     }
   } catch (err) {
     log.error(`Failed to update config: ${err.message}`);
