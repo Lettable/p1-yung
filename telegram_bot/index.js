@@ -330,7 +330,7 @@ const initializeBot = () => {
     const pendingUploads = audioHandler.getPendingUploads();
 
     // Handle Caller ID reply
-    if (userStates[chatId] && userStates[chatId].screen === "awaiting_caller_id" && msg.reply_to_message) {
+    if (userStates[chatId] && userStates[chatId].screen === "awaiting_caller_id") {
       const newCallerID = msg.text?.trim();
       if (newCallerID) {
         setSettings({ callerID: newCallerID });
@@ -347,8 +347,7 @@ const initializeBot = () => {
     // Handle audio name reply
     if (
       pendingUploads[chatId] &&
-      pendingUploads[chatId].stage === "waiting_for_name" &&
-      msg.reply_to_message
+      pendingUploads[chatId].stage === "waiting_for_name"
     ) {
       const audioName = msg.text?.trim();
       if (audioName) {
@@ -358,6 +357,7 @@ const initializeBot = () => {
           console.error(`[telegram] Audio name handler error: ${err.message}`);
         }
       }
+      return;
     }
   });
 
