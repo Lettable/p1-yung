@@ -269,9 +269,15 @@ const setup = async () => {
 
   log.info("Configure your SIP gateway/peer details.");
 
-  setupData.sip.domain = await prompt("Enter SIP Domain or IP (e.g., gateway.example.com or 192.168.1.1)");
+  setupData.sip.domain = await prompt("Enter SIP Domain or IP (e.g., gateway.bitcall.io)");
   if (!setupData.sip.domain) {
     log.error("SIP Domain/IP is required");
+    process.exit(1);
+  }
+
+  setupData.sip.username = await prompt("Enter SIP Username");
+  if (!setupData.sip.username) {
+    log.error("SIP Username is required");
     process.exit(1);
   }
 
@@ -283,6 +289,7 @@ const setup = async () => {
 
   log.success("SIP configuration saved");
   log.dim(`  Domain/IP: ${setupData.sip.domain}`);
+  log.dim(`  Username: ${setupData.sip.username}`);
   log.dim(`  Password: ${"*".repeat(setupData.sip.password.length)}`);
 
   // Step 7: Auto-Generate Universal Test Beep Sound
@@ -374,6 +381,7 @@ ASTERISK_PASSWORD=${setupData.asterisk.password}
 
 # SIP Configuration
 SIP_DOMAIN=${setupData.sip.domain}
+SIP_USERNAME=${setupData.sip.username}
 SIP_PASSWORD=${setupData.sip.password}
 
 # Application Configuration
@@ -481,6 +489,62 @@ EOF`);
         `Could not auto-configure extensions.conf: ${err.message}`
       );
       setupData.asterisk.extensionsConfConfigured = false;
+    }
+
+    // Create/update Asterisk pjsip.conf
+    log.step("Setting up Asterisk pjsip.conf...");
+
+    const pjsipConfTemplate = `[transport-udp]
+type=transport
+protocol=udp
+bind=0.0.0.0:5060
+
+[bitcall-auth]
+type=auth
+auth_type=userpass
+username=${setupData.sip.username}
+password=${setupData.sip.password}
+
+[bitcall-aor]
+type=aor
+contact=sip:${setupData.sip.username}@${setupData.sip.domain}:5060
+
+[bitcall-endpoint]
+type=endpoint
+transport=transport-udp
+outbound_auth=bitcall-auth
+aors=bitcall-aor
+allow=ulaw,alaw,gsm
+context=test
+`;
+
+    const pjsipConfPath = path.join(asteriskConfigDir, "pjsip.conf");
+
+    try {
+      if (process.platform === "linux" && fs.existsSync(asteriskConfigDir)) {
+        try {
+          execSync(`sudo tee ${pjsipConfPath} > /dev/null << 'EOF'
+${pjsipConfTemplate}
+EOF`);
+
+          execSync("sudo asterisk -rx 'module reload res_pjsip'");
+          log.success("Asterisk pjsip.conf configured and reloaded");
+          setupData.asterisk.pjsipConfConfigured = true;
+        } catch (err) {
+          log.warning(
+            "Could not auto-configure pjsip.conf. Manual setup needed:"
+          );
+          log.dim(`\nRun: sudo nano /etc/asterisk/pjsip.conf`);
+          log.dim("Add this configuration:");
+          console.log(pjsipConfTemplate);
+          setupData.asterisk.pjsipConfConfigured = false;
+        }
+      }
+    } catch (err) {
+      log.warning(
+        `Could not auto-configure pjsip.conf: ${err.message}`
+      );
+      setupData.asterisk.pjsipConfConfigured = false;
     }
   } catch (err) {
     log.error(`Failed to update config: ${err.message}`);

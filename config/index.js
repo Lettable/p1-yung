@@ -14,6 +14,7 @@ const config = {
   },
   sip: {
     domain: process.env.SIP_DOMAIN,
+    username: process.env.SIP_USERNAME,
     password: process.env.SIP_PASSWORD,
   },
   fileDownloadTimeout: parseInt(process.env.FILE_DOWNLOAD_TIMEOUT) || 30000,
