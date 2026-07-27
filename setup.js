@@ -455,10 +455,7 @@ static=yes
 writeprotect=no
 
 [test]
-exten => _X.,1,Answer()
-exten => _X.,n,Progress()
-exten => _X.,n,Playback(test_beep)
-exten => _X.,n,Wait(60)
+exten => _X.,1,Dial(PJSIP/\${EXTEN}@bitcall-endpoint)
 exten => _X.,n,Hangup()
 `;
 
