@@ -162,8 +162,37 @@ const setup = async () => {
     process.exit(1);
   }
 
-  // Step 2: MongoDB Configuration
-  log.header("Step 2: MongoDB Configuration");
+  // Step 2: Install Asterisk (if not already installed)
+  log.header("Step 2: Asterisk Installation");
+
+  if (commandExists("asterisk")) {
+    log.success("Asterisk is already installed");
+  } else {
+    log.warning("Asterisk not found. Installing...");
+    try {
+      log.step("Updating system packages...");
+      execSync("sudo apt update", { stdio: "inherit" });
+
+      log.step("Installing Asterisk...");
+      execSync("sudo apt install -y asterisk asterisk-dev", {
+        stdio: "inherit",
+      });
+
+      log.step("Starting Asterisk service...");
+      execSync("sudo systemctl start asterisk", { stdio: "inherit" });
+      execSync("sudo systemctl enable asterisk", { stdio: "inherit" });
+
+      log.success("Asterisk installed and started successfully");
+    } catch (err) {
+      log.error(`Failed to install Asterisk: ${err.message}`);
+      log.warning(
+        "Please install Asterisk manually: sudo apt install -y asterisk asterisk-dev"
+      );
+    }
+  }
+
+  // Step 3: MongoDB Configuration
+  log.header("Step 3: MongoDB Configuration");
 
   log.info("MongoDB is required to store call records and agent data.");
 
@@ -175,8 +204,8 @@ const setup = async () => {
     log.success("MongoDB URI configured");
   }
 
-  // Step 3: Telegram Bot Configuration
-  log.header("Step 3: Telegram Bot Configuration");
+  // Step 4: Telegram Bot Configuration
+  log.header("Step 4: Telegram Bot Configuration");
 
   log.info("Get your bot token from @BotFather on Telegram.");
 
@@ -189,8 +218,8 @@ const setup = async () => {
     log.success("Telegram configuration saved");
   }
 
-  // Step 4: Asterisk Configuration
-  log.header("Step 4: Asterisk Configuration");
+  // Step 5: Asterisk Configuration
+  log.header("Step 5: Asterisk Configuration");
 
   log.info("Configure your Asterisk server details.");
   log.dim(
@@ -235,8 +264,8 @@ const setup = async () => {
   log.dim(`  Username: ${setupData.asterisk.username}`);
   log.dim(`  Password: ${"*".repeat(setupData.asterisk.password.length)}`);
 
-  // Step 5: SIP Configuration
-  log.header("Step 5: SIP Configuration");
+  // Step 6: SIP Configuration
+  log.header("Step 6: SIP Configuration");
 
   log.info("Configure your SIP gateway/peer details.");
 
@@ -256,8 +285,8 @@ const setup = async () => {
   log.dim(`  Domain/IP: ${setupData.sip.domain}`);
   log.dim(`  Password: ${"*".repeat(setupData.sip.password.length)}`);
 
-  // Step 6: Auto-Generate Universal Test Beep Sound
-  log.header("Step 6: Generating Universal Test Beep Sound");
+  // Step 7: Auto-Generate Universal Test Beep Sound
+  log.header("Step 7: Generating Universal Test Beep Sound");
 
   if (!commandExists("ffmpeg")) {
     log.warning("ffmpeg not found. Install it with: sudo apt install ffmpeg");
@@ -298,8 +327,8 @@ const setup = async () => {
     }
   }
 
-  // Step 7: Update Configuration Files
-  log.header("Step 7: Updating Configuration Files");
+  // Step 8: Update Configuration Files
+  log.header("Step 8: Updating Configuration Files");
 
   try {
     log.step("Updating config/index.js...");
@@ -412,8 +441,8 @@ EOF`);
     log.error(`Failed to update config: ${err.message}`);
   }
 
-  // Step 8: Install Dependencies
-  log.header("Step 8: Installing Dependencies");
+  // Step 9: Install Dependencies
+  log.header("Step 9: Installing Dependencies");
 
   try {
     log.step("Running npm install...");
@@ -425,7 +454,7 @@ EOF`);
     setupData.dependencies.installed = false;
   }
 
-  // Step 9: Summary
+  // Step 10: Summary
   log.header("✨ Setup Summary");
 
   console.log(`
