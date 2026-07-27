@@ -128,7 +128,6 @@ const initializeBot = () => {
 
   // Initialize audio handler
   audioHandler.setBot(bot);
-  });
 
   bot.onText(/\/permit (\d+)/, async (msg, match) => {
     const chatId = msg.chat.id;
