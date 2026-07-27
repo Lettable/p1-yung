@@ -591,6 +591,7 @@ const initializeBot = () => {
           },
         }
       ).catch((err) => console.error(`[telegram] Set caller ID message error: ${err.message}`));
+      userStates[chatId] = { screen: "awaiting_caller_id" };
       bot.answerCallbackQuery(query.id);
       return;
     }
