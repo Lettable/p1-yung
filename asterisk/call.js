@@ -54,11 +54,12 @@ module.exports = async (entry) => {
   const actionId = `call-${number}-${Date.now()}`;
 
   const callerID = settings?.callerID || number;
+  const context = settings?.selectedAudio || "test";
 
   ami.action({
     action: "Originate",
     channel: `PJSIP/${number}@bitcall-endpoint`,
-    context: "test",
+    context: context,
     exten: number,
     priority: 1,
     actionid: actionId,

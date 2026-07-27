@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const { execSync, spawn } = require("child_process");
 const readline = require("readline");
+const { updateExtensionsConf } = require("./utils/extensionsGenerator");
 
 // Color codes for terminal output
 const colors = {
@@ -545,6 +546,17 @@ EOF`);
     }
   } catch (err) {
     log.error(`Failed to update config: ${err.message}`);
+  }
+
+  // Step 8.5: Generate Extensions from Database
+  log.step("Generating extensions from database...");
+
+  try {
+    await updateExtensionsConf([]);
+    log.success("Extensions generated (default test extension created)");
+  } catch (err) {
+    log.warning(`Could not auto-generate extensions: ${err.message}`);
+    log.dim("Extensions will be generated when you add audio files via the bot");
   }
 
   // Step 9: Install Dependencies

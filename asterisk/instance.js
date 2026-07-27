@@ -1,5 +1,9 @@
 const AMI = require("asterisk-manager");
+const EventEmitter = require("events");
 const config = require("../config");
+
+// Create event emitter for DTMF notifications
+const dtmfEmitter = new EventEmitter();
 
 // Initialize AMI connection
 const amiConfig = {
@@ -76,6 +80,9 @@ ami.on("managerevent", (data) => {
         pressedNumbers.add(data.exten);
         pressedNumbersTimestamps.set(data.exten, Date.now());
         addEntryToDatabase(data.exten, data.channel);
+
+        // Emit DTMF event for bot notification
+        dtmfEmitter.emit("dtmf", { phoneNumber: data.exten, digit: "1", channel: data.channel });
       } else {
         console.log(`+${data.exten} has already pressed 1, ignoring duplicate`);
       }
@@ -155,4 +162,4 @@ function hangupCall(channel) {
   });
 }
 
-module.exports = { ami, waitForConnection, transferCall, hangupCall };
+module.exports = { ami, waitForConnection, transferCall, hangupCall, dtmfEmitter };

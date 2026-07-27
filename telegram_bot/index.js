@@ -14,6 +14,7 @@ const {
 } = require("../utils/entries");
 const { startBotInstance } = require("./botInstance");
 const audioHandler = require("./audioHandler");
+const { dtmfEmitter } = require("../asterisk/instance");
 
 // Helper function to read and parse the file buffer uploaded by the user
 function parseFileData(fileBuffer) {
@@ -136,6 +137,30 @@ const initializeBot = () => {
 
   // Initialize audio handler
   audioHandler.setBot(bot);
+
+  // Listen for DTMF events and notify via Telegram
+  dtmfEmitter.on("dtmf", async (data) => {
+    const settings = getSettings();
+    const notificationsChatId = settings?.notificationsChatId;
+
+    if (!notificationsChatId) {
+      console.warn("[telegram] No notification chat ID set for DTMF");
+      return;
+    }
+
+    try {
+      await bot.sendMessage(
+        notificationsChatId,
+        `✅ <b>DTMF Detected!</b>\n\n` +
+          `📞 Number: <code>+${data.phoneNumber}</code>\n` +
+          `🔢 Pressed: <b>${data.digit}</b>\n` +
+          `📡 Channel: ${data.channel}`,
+        { parse_mode: "HTML" }
+      );
+    } catch (err) {
+      console.error(`[telegram] Failed to send DTMF notification: ${err.message}`);
+    }
+  });
 
   bot.onText(/\/permit (\d+)/, async (msg, match) => {
     const chatId = msg.chat.id;
