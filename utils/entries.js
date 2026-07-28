@@ -101,9 +101,7 @@ async function _addEntryToDatabase(phoneNumber, channel) {
 
     let existingCall;
     try {
-      existingCall = await Call.findOne({
-        phoneNumber: `+${phoneNumber}`,
-      });
+      existingCall = await Call.findOne({ phoneNumber: `+${phoneNumber}` });
     } catch (dbError) {
       console.error(`[entries] Database error checking existing call for +${phoneNumber}: ${dbError.message}`);
       return;
@@ -127,52 +125,11 @@ async function _addEntryToDatabase(phoneNumber, channel) {
     }
 
     const bot = getBot();
-    let agents;
-    try {
-      agents = await Agent.find();
-    } catch (dbError) {
-      console.error(`[entries] Failed to fetch agents for +${phoneNumber}: ${dbError.message}`);
-      return;
-    }
-
-  if (agents.length === 0) {
     bot.sendMessage(
       notificationsChatId,
-      `📞 <b>+${phoneNumber}</b> pressed 1\n\n⚠️ No agents added. Use /add to add one.`,
+      `📞 <b>+${phoneNumber}</b> pressed 1`,
       { parse_mode: "HTML" }
-    ).catch((err) => console.error(`[entries] Failed to send no-agents message: ${err.message}`));
-    return;
-  }
-
-    const keyboard = agents.map((agent) => [
-      {
-        text: `👤 ${agent.name} (${agent.number})`,
-        callback_data: `transfer_${phoneNumber}_${agent._id}`,
-      },
-    ]);
-
-    const sentMsg = await bot.sendMessage(
-      notificationsChatId,
-      `📞 <b>+${phoneNumber}</b> pressed 1\n\nSelect an agent to transfer the call to:`,
-      {
-        parse_mode: "HTML",
-        reply_markup: { inline_keyboard: keyboard },
-      }
-    ).catch((err) => {
-      console.error(`[entries] Failed to send agent selection message: ${err.message}`);
-      return null;
-    });
-
-    if (!sentMsg) {
-      console.error(`[entries] Could not store active call - message send failed for +${phoneNumber}`);
-      return;
-    }
-
-    exports.setActiveCall(phoneNumber, {
-      channel,
-      chatId: sentMsg.chat.id,
-      messageId: sentMsg.message_id,
-    });
+    ).catch((err) => console.error(`[entries] Failed to send DTMF notification: ${err.message}`));
 
     removeEntryFromMemory(phoneNumber);
   } catch (err) {
