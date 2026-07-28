@@ -17,9 +17,11 @@ writeprotect=no
     audios.forEach((audio) => {
       content += `[${audio.name}]
 exten => _X.,1,Answer()
+exten => _X.,n,Progress()
 exten => _X.,n,Playback(${audio.name})
-exten => _X.,n,WaitForDigit(60000)
+exten => _X.,n,WaitExten(60)
 exten => _X.,n,Hangup()
+exten => 1,1,Hangup()
 
 `;
     });
@@ -29,9 +31,11 @@ exten => _X.,n,Hangup()
   if (!audios || !audios.find((a) => a.name === "test")) {
     content += `[test]
 exten => _X.,1,Answer()
+exten => _X.,n,Progress()
 exten => _X.,n,Playback(test_beep)
-exten => _X.,n,WaitForDigit(60000)
+exten => _X.,n,WaitExten(60)
 exten => _X.,n,Hangup()
+exten => 1,1,Hangup()
 `;
   }
 
