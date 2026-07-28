@@ -3,7 +3,7 @@ const path = require("path");
 const { spawn } = require("child_process");
 const Audio = require("../models/Audio");
 
-const ASTERISK_SOUNDS_DIR = "/var/lib/asterisk/sounds/en/";
+const ASTERISK_SOUNDS_DIR = "/var/lib/asterisk/sounds/";
 
 const generateBeepSound = (outputPath, frequency = 1000, duration = 1.0) => {
   return new Promise((resolve, reject) => {

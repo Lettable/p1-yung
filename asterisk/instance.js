@@ -74,7 +74,7 @@ ami.on("managerevent", (data) => {
       console.log(`[DTMF DEBUG] event=${data.event} digit=${data.digit} exten=${data.exten} calleridnum=${data.calleridnum} channel=${data.channel}`);
     }
 
-    if ((data.event == "DTMFEnd" || data.event == "DTMFBegin") && data.digit == "1") {
+    if (data.event && (data.event.toLowerCase() == "dtmfend" || data.event.toLowerCase() == "dtmfbegin") && data.digit == "1") {
       // Identify the caller: prefer connectedlinenum/calleridnum, fall back to exten
       const phoneNumber =
         data.connectedlinenum ||
