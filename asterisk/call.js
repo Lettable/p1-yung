@@ -45,16 +45,11 @@ module.exports = async (entry) => {
 
   console.log(`[DEBUG] Original number: ${originalNumber}`);
   console.log(`[DEBUG] Sanitized number: ${number}`);
-  console.log(`[DEBUG] Context: ${context}`);
-
-  addEntryToMemory({ ...entry, phoneNumber: number });
-
-  console.log(`Ringing number ${number}`);
-
-  const actionId = `call-${number}-${Date.now()}`;
 
   const callerID = settings?.callerID || number;
   const context = settings?.selectedAudio || "test";
+
+  console.log(`[DEBUG] Context: ${context}`);
 
   ami.action({
     action: "Originate",
