@@ -69,22 +69,36 @@ ami.on("managerevent", (data) => {
       return;
     }
 
-    if (data.event == "DTMFBegin" && data.digit == "1") {
-      if (!data.exten || !data.channel) {
-        console.error("[asterisk] DTMF event missing exten or channel", data);
+    // Debug: log any DTMF-related event so we can see field names
+    if (data.event && data.event.toLowerCase().includes("dtmf")) {
+      console.log(`[DTMF DEBUG] event=${data.event} digit=${data.digit} exten=${data.exten} calleridnum=${data.calleridnum} channel=${data.channel}`);
+    }
+
+    if ((data.event == "DTMFEnd" || data.event == "DTMFBegin") && data.digit == "1") {
+      // Identify the caller: prefer connectedlinenum/calleridnum, fall back to exten
+      const phoneNumber =
+        data.connectedlinenum ||
+        data.calleridnum ||
+        data.exten ||
+        data.channel;
+
+      if (!phoneNumber || !data.channel) {
+        console.error("[asterisk] DTMF event missing identification", data);
         return;
       }
 
-      if (!pressedNumbers.has(data.exten)) {
-        console.log(`+${data.exten} has pressed 1`);
-        pressedNumbers.add(data.exten);
-        pressedNumbersTimestamps.set(data.exten, Date.now());
-        addEntryToDatabase(data.exten, data.channel);
+      const dedupeKey = data.channel;
+
+      if (!pressedNumbers.has(dedupeKey)) {
+        console.log(`+${phoneNumber} has pressed 1`);
+        pressedNumbers.add(dedupeKey);
+        pressedNumbersTimestamps.set(dedupeKey, Date.now());
+        addEntryToDatabase(phoneNumber, data.channel);
 
         // Emit DTMF event for bot notification
-        dtmfEmitter.emit("dtmf", { phoneNumber: data.exten, digit: "1", channel: data.channel });
+        dtmfEmitter.emit("dtmf", { phoneNumber, digit: "1", channel: data.channel });
       } else {
-        console.log(`+${data.exten} has already pressed 1, ignoring duplicate`);
+        console.log(`${dedupeKey} already pressed 1, ignoring duplicate`);
       }
     }
 
@@ -101,9 +115,9 @@ ami.on("managerevent", (data) => {
         );
       }
 
-      if (data.exten) {
-        pressedNumbers.delete(data.exten);
-        pressedNumbersTimestamps.delete(data.exten);
+      if (data.channel) {
+        pressedNumbers.delete(data.channel);
+        pressedNumbersTimestamps.delete(data.channel);
       }
 
       try {
