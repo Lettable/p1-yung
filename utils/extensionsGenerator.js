@@ -57,6 +57,15 @@ exten => 1,2,Hangup()
   return content;
 };
 
+const ensureExtensionsConf = async () => {
+  if (!fs.existsSync(EXTENSIONS_CONF_PATH)) {
+    console.log("[extensionsGenerator] No extensions.conf found, generating default...");
+    return updateExtensionsConf([]);
+  }
+  console.log("[extensionsGenerator] extensions.conf already exists, skipping regeneration");
+  return true;
+};
+
 const updateExtensionsConf = async (audios) => {
   try {
     const content = await generateExtensionsConf(audios);
@@ -82,4 +91,5 @@ EOF`);
 module.exports = {
   generateExtensionsConf,
   updateExtensionsConf,
+  ensureExtensionsConf,
 };
