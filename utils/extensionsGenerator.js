@@ -40,8 +40,11 @@ exten => 1,2,Hangup()
 `;
 
   // Create extension for each audio (user-added audios)
+  // Skip built-in test audio names that have hardcoded contexts above
+  const BUILT_IN = new Set(["test", "test-one", "test-two"]);
   if (audios && audios.length > 0) {
     audios.forEach((audio) => {
+      if (BUILT_IN.has(audio.name)) return;
       content += `[${audio.name}]
 exten => _X.,1,Answer()
 exten => _X.,n,Playback(/var/lib/asterisk/sounds/${audio.name})
