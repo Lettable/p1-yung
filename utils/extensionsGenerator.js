@@ -42,7 +42,7 @@ exten => 1,2,Hangup()`;
       content += `[${audio.name}]
 exten => _X.,1,Answer()
 exten => _X.,n,Progress()
-exten => _X.,n,Background(/var/lib/asterisk/sounds/${audio.name})
+exten => _X.,n,Background(/var/lib/asterisk/sounds/${audio.name},m)
 exten => _X.,n,Hangup()
 ${dtmfHandling}
 
