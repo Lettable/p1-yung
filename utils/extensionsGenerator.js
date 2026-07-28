@@ -15,26 +15,26 @@ writeprotect=no
   // Always include base test extensions
   content += `[test]
 exten => _X.,1,Answer()
-exten => _X.,n,Playback(/var/lib/asterisk/sounds/test_beep)
+exten => _X.,n,Playback(test_beep)
 exten => _X.,n,WaitExten(10)
 exten => _X.,n,Hangup()
-exten => 1,1,Wait(3600)
+exten => 1,1,Wait(60)
 exten => 1,2,Hangup()
 
 [test-one]
 exten => _X.,1,Answer()
-exten => _X.,n,Playback(/var/lib/asterisk/sounds/test-one)
+exten => _X.,n,Playback(test-one)
 exten => _X.,n,WaitExten(10)
 exten => _X.,n,Hangup()
-exten => 1,1,Wait(3600)
+exten => 1,1,Wait(60)
 exten => 1,2,Hangup()
 
 [test-two]
 exten => _X.,1,Answer()
-exten => _X.,n,Playback(/var/lib/asterisk/sounds/test-two)
+exten => _X.,n,Playback(test-two)
 exten => _X.,n,WaitExten(10)
 exten => _X.,n,Hangup()
-exten => 1,1,Wait(3600)
+exten => 1,1,Wait(60)
 exten => 1,2,Hangup()
 
 `;
@@ -47,10 +47,10 @@ exten => 1,2,Hangup()
       if (BUILT_IN.has(audio.name)) return;
       content += `[${audio.name}]
 exten => _X.,1,Answer()
-exten => _X.,n,Playback(/var/lib/asterisk/sounds/${audio.name})
+exten => _X.,n,Playback(${audio.name})
 exten => _X.,n,WaitExten(10)
 exten => _X.,n,Hangup()
-exten => 1,1,Wait(3600)
+exten => 1,1,Wait(60)
 exten => 1,2,Hangup()
 
 `;

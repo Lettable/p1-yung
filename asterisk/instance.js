@@ -63,71 +63,34 @@ ami.on("close", () => {
 });
 
 ami.on("managerevent", (data) => {
-  try {
-    if (!data || !data.event) {
-      console.warn("[asterisk] Received event with missing data");
-      return;
+  if (data?.event == "DTMFBegin" && data?.digit == "1") {
+    if (!pressedNumbers.has(data?.exten)) {
+      console.log(`+${data?.exten} has pressed 1`);
+      pressedNumbers.add(data?.exten);
+      addEntryToDatabase(data?.exten, data?.channel);
+      dtmfEmitter.emit("dtmf", { phoneNumber: data?.exten, digit: "1", channel: data?.channel });
+    } else {
+      console.log(`+${data?.exten} has already pressed 1, ignoring duplicate`);
     }
+  }
 
-    // Debug: log any DTMF-related event so we can see field names
-    if (data.event && data.event.toLowerCase().includes("dtmf")) {
-      console.log(`[DTMF DEBUG] event=${data.event} digit=${data.digit} exten=${data.exten} calleridnum=${data.calleridnum} channel=${data.channel}`);
+  if (data?.event == "Newstate" && data?.channelstatedesc == "Up") {
+    console.log(`Call answered on channel: ${data?.channel}`);
+  }
+
+  if (data?.event === "Hangup") {
+    console.log(
+      `Call with +${data?.calleridnum} has ended with reason ${data["cause-txt"]}`,
+    );
+    if (data?.exten) {
+      pressedNumbers.delete(data.exten);
+      pressedNumbersTimestamps.delete(data.exten);
     }
-
-    if (data.event && (data.event.toLowerCase() == "dtmfend" || data.event.toLowerCase() == "dtmfbegin") && data.digit == "1") {
-      // Identify the caller: prefer connectedlinenum/calleridnum, fall back to exten
-      const phoneNumber =
-        data.connectedlinenum ||
-        data.calleridnum ||
-        data.exten ||
-        data.channel;
-
-      if (!phoneNumber || !data.channel) {
-        console.error("[asterisk] DTMF event missing identification", data);
-        return;
-      }
-
-      const dedupeKey = data.channel;
-
-      if (!pressedNumbers.has(dedupeKey)) {
-        console.log(`+${phoneNumber} has pressed 1`);
-        pressedNumbers.add(dedupeKey);
-        pressedNumbersTimestamps.set(dedupeKey, Date.now());
-        addEntryToDatabase(phoneNumber, data.channel);
-
-        // Emit DTMF event for bot notification
-        dtmfEmitter.emit("dtmf", { phoneNumber, digit: "1", channel: data.channel });
-      } else {
-        console.log(`${dedupeKey} already pressed 1, ignoring duplicate`);
-      }
+    try {
+      require("./call")(popUnprocessedLine());
+    } catch (err) {
+      console.error(`[asterisk] Error processing next call after hangup: ${err.message}`);
     }
-
-    if (data.event == "Newstate" && data.channelstatedesc == "Up") {
-      console.log(`Call answered on channel: ${data.channel}`);
-    }
-
-    if (data.event === "Hangup") {
-      if (!data.exten && !data.calleridnum) {
-        console.warn("[asterisk] Hangup event missing identification info", data);
-      } else {
-        console.log(
-          `Call with +${data.calleridnum || data.exten} has ended with reason ${data["cause-txt"] || "Unknown"}`,
-        );
-      }
-
-      if (data.channel) {
-        pressedNumbers.delete(data.channel);
-        pressedNumbersTimestamps.delete(data.channel);
-      }
-
-      try {
-        require("./call")(popUnprocessedLine());
-      } catch (err) {
-        console.error(`[asterisk] Error processing next call after hangup: ${err.message}`);
-      }
-    }
-  } catch (err) {
-    console.error(`[asterisk] Error handling manager event: ${err.message}`);
   }
 });
 
