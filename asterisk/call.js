@@ -45,7 +45,7 @@ module.exports = async (entry) => {
 
   console.log(`[DEBUG] Original number: ${originalNumber}`);
   console.log(`[DEBUG] Sanitized number: ${number}`);
-  console.log(`[DEBUG] Context: test`);
+  console.log(`[DEBUG] Context: ${context}`);
 
   addEntryToMemory({ ...entry, phoneNumber: number });
 
