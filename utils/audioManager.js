@@ -142,15 +142,19 @@ const getAudioPath = async (audioName) => {
 
 const initializeTestAudio = async () => {
   try {
+    const outputPath = path.join(ASTERISK_SOUNDS_DIR, "test_beep.wav");
     const existingTest = await Audio.findOne({ name: "test" });
-    if (existingTest) {
+
+    if (existingTest && fs.existsSync(outputPath)) {
       return existingTest;
+    }
+
+    if (existingTest && !fs.existsSync(outputPath)) {
+      console.log("[audioManager] test audio DB entry exists but file missing, regenerating...");
     }
 
     const tempPath = path.join("/tmp", "test_beep.wav");
     await generateBeepSound(tempPath, 1000, 1.0);
-
-    const outputPath = path.join(ASTERISK_SOUNDS_DIR, "test_beep.wav");
 
     if (!fs.existsSync(ASTERISK_SOUNDS_DIR)) {
       require("child_process").execSync(`sudo mkdir -p ${ASTERISK_SOUNDS_DIR}`);
@@ -165,12 +169,17 @@ const initializeTestAudio = async () => {
     }
     require("child_process").execSync(`sudo chmod 644 "${outputPath}"`);
 
-    const audio = await Audio.create({
-      name: "test",
-      path: outputPath,
-      format: "wav",
-      size: fs.statSync(outputPath).size,
-    });
+    const audio = await Audio.findOneAndUpdate(
+      { name: "test" },
+      {
+        name: "test",
+        path: outputPath,
+        format: "wav",
+        size: fs.statSync(outputPath).size,
+        createdAt: new Date(),
+      },
+      { upsert: true, new: true }
+    );
 
     return audio;
   } catch (err) {
