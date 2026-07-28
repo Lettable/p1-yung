@@ -12,7 +12,7 @@ writeprotect=no
 
 `;
 
-  // Always include base test extensions
+  // Always include base test extension
   content += `[test]
 exten => _X.,1,Answer()
 exten => _X.,n,Playback(test_beep)
@@ -21,27 +21,11 @@ exten => _X.,n,Hangup()
 exten => 1,1,Wait(60)
 exten => 1,2,Hangup()
 
-[test-one]
-exten => _X.,1,Answer()
-exten => _X.,n,Playback(test-one)
-exten => _X.,n,WaitExten(10)
-exten => _X.,n,Hangup()
-exten => 1,1,Wait(60)
-exten => 1,2,Hangup()
-
-[test-two]
-exten => _X.,1,Answer()
-exten => _X.,n,Playback(test-two)
-exten => _X.,n,WaitExten(10)
-exten => _X.,n,Hangup()
-exten => 1,1,Wait(60)
-exten => 1,2,Hangup()
-
 `;
 
-  // Create extension for each audio (user-added audios)
-  // Skip built-in test audio names that have hardcoded contexts above
-  const BUILT_IN = new Set(["test", "test-one", "test-two"]);
+  // Create extension for each user-added audio
+  // Skip "test" since it has a hardcoded context above using test_beep
+  const BUILT_IN = new Set(["test"]);
   if (audios && audios.length > 0) {
     audios.forEach((audio) => {
       if (BUILT_IN.has(audio.name)) return;

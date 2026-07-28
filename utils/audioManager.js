@@ -142,55 +142,46 @@ const getAudioPath = async (audioName) => {
 
 const initializeTestAudio = async () => {
   try {
-    const BUILT_IN_NAMES = ["test", "test-one", "test-two"];
-    const results = [];
+    const outputPath = path.join(ASTERISK_SOUNDS_DIR, "test_beep.wav");
+    const existingTest = await Audio.findOne({ name: "test" });
 
-    for (const name of BUILT_IN_NAMES) {
-      const beepName = name === "test" ? "test_beep" : name;
-      const outputPath = path.join(ASTERISK_SOUNDS_DIR, `${beepName}.wav`);
-      const existing = await Audio.findOne({ name });
-
-      if (existing && fs.existsSync(outputPath)) {
-        results.push(existing);
-        continue;
-      }
-
-      if (existing && !fs.existsSync(outputPath)) {
-        console.log(`[audioManager] ${name} DB entry exists but file missing, regenerating...`);
-      }
-
-      const tempPath = path.join("/tmp", `${beepName}.wav`);
-      await generateBeepSound(tempPath, 1000, 1.0);
-
-      if (!fs.existsSync(ASTERISK_SOUNDS_DIR)) {
-        require("child_process").execSync(`sudo mkdir -p ${ASTERISK_SOUNDS_DIR}`);
-      }
-
-      require("child_process").execSync(`sudo mv "${tempPath}" "${outputPath}"`);
-
-      try {
-        require("child_process").execSync(`sudo chown asterisk:asterisk "${outputPath}"`);
-      } catch {
-        // Asterisk user might not exist locally
-      }
-      require("child_process").execSync(`sudo chmod 644 "${outputPath}"`);
-
-      const audio = await Audio.findOneAndUpdate(
-        { name },
-        {
-          name,
-          path: outputPath,
-          format: "wav",
-          size: fs.statSync(outputPath).size,
-          createdAt: new Date(),
-        },
-        { upsert: true, new: true }
-      );
-
-      results.push(audio);
+    if (existingTest && fs.existsSync(outputPath)) {
+      return existingTest;
     }
 
-    return results[0];
+    if (existingTest && !fs.existsSync(outputPath)) {
+      console.log("[audioManager] test audio DB entry exists but file missing, regenerating...");
+    }
+
+    const tempPath = path.join("/tmp", "test_beep.wav");
+    await generateBeepSound(tempPath, 1000, 1.0);
+
+    if (!fs.existsSync(ASTERISK_SOUNDS_DIR)) {
+      require("child_process").execSync(`sudo mkdir -p ${ASTERISK_SOUNDS_DIR}`);
+    }
+
+    require("child_process").execSync(`sudo mv "${tempPath}" "${outputPath}"`);
+
+    try {
+      require("child_process").execSync(`sudo chown asterisk:asterisk "${outputPath}"`);
+    } catch {
+      // Asterisk user might not exist locally
+    }
+    require("child_process").execSync(`sudo chmod 644 "${outputPath}"`);
+
+    const audio = await Audio.findOneAndUpdate(
+      { name: "test" },
+      {
+        name: "test",
+        path: outputPath,
+        format: "wav",
+        size: fs.statSync(outputPath).size,
+        createdAt: new Date(),
+      },
+      { upsert: true, new: true }
+    );
+
+    return audio;
   } catch (err) {
     console.error(`[audioManager] Failed to initialize test audio: ${err.message}`);
     throw err;
