@@ -398,6 +398,12 @@ const initializeBot = () => {
     }
 
     try {
+      const pendingOutros = audioHandler.getPendingOutros();
+      if (pendingOutros[chatId] && pendingOutros[chatId].stage === "waiting_for_outro") {
+        await audioHandler.handleOutroFile(chatId, fileId);
+        return;
+      }
+
       await audioHandler.handleAudioFile(chatId, fileId);
     } catch (err) {
       console.error(`[telegram] Audio file handler error: ${err.message}`);
@@ -598,6 +604,30 @@ const initializeBot = () => {
         bot.answerCallbackQuery(query.id);
       } catch (err) {
         console.error(`[telegram] Cancel audio error: ${err.message}`);
+      }
+      return;
+    }
+
+    if (callbackData.startsWith("outro_upload:")) {
+      const audioName = callbackData.replace("outro_upload:", "");
+      try {
+        await audioHandler.handleOutroUploadButton(chatId, audioName);
+        bot.answerCallbackQuery(query.id);
+      } catch (err) {
+        console.error(`[telegram] Outro upload error: ${err.message}`);
+        bot.answerCallbackQuery(query.id, { text: "❌ Error", show_alert: true });
+      }
+      return;
+    }
+
+    if (callbackData.startsWith("outro_delete:")) {
+      const audioName = callbackData.replace("outro_delete:", "");
+      try {
+        await audioHandler.handleDeleteOutroButton(chatId, audioName);
+        bot.answerCallbackQuery(query.id);
+      } catch (err) {
+        console.error(`[telegram] Outro delete error: ${err.message}`);
+        bot.answerCallbackQuery(query.id, { text: "❌ Error", show_alert: true });
       }
       return;
     }

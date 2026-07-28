@@ -30,14 +30,22 @@ exten => 1,2,Hangup()
   if (audios && audios.length > 0) {
     audios.forEach((audio) => {
       if (BUILT_IN.has(audio.name)) return;
+
+      let dtmfHandling;
+      if (audio.outro) {
+        dtmfHandling = `exten => 1,1,Playback(${audio.outro.replace(/\.wav$/, "")})
+exten => 1,2,Hangup()`;
+      } else {
+        dtmfHandling = `exten => 1,1,Hangup()`;
+      }
+
       content += `[${audio.name}]
 exten => _X.,1,Answer()
 exten => _X.,n,Progress()
 exten => _X.,n,Playback(/var/lib/asterisk/sounds/${audio.name})
 exten => _X.,n,WaitExten(10)
 exten => _X.,n,Hangup()
-exten => 1,1,Wait(60)
-exten => 1,2,Hangup()
+${dtmfHandling}
 
 `;
     });

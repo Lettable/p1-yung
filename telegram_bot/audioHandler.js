@@ -3,12 +3,13 @@ const path = require("path");
 const axios = require("axios");
 const config = require("../config");
 const Audio = require("../models/Audio");
-const { saveAudio, deleteAudio, getAudioList } = require("../utils/audioManager");
+const { saveAudio, deleteAudio, getAudioList, saveOutro, deleteOutro } = require("../utils/audioManager");
 const { updateExtensionsConf } = require("../utils/extensionsGenerator");
 
 let bot;
 let pendingAudioUploads = {};
-let userStates = {}; // Track user's current screen/state
+let pendingOutroUploads = {};
+let userStates = {};
 
 const ITEMS_PER_PAGE = 3;
 
@@ -113,14 +114,22 @@ const handleAudioDetail = async (chatId, audioName) => {
       `🎵 **${audio.name}**\n\n` +
       `📊 Size: ${sizeKB} KB\n` +
       `📅 Added: ${createdDate}\n` +
-      `📁 Path: \`${audio.path}\``;
+      `📁 Path: \`${audio.path}\`\n` +
+      `🔉 Outro: ${audio.outro ? "✅ Set" : "❌ None"}`;
 
     const buttons = [
       [
         { text: "⬅️ Back", callback_data: "view_audios" },
         { text: "🗑️ Delete", callback_data: `delete_audio:${audio.name}` },
       ],
+      [
+        { text: audio.outro ? "🔊 Change Outro" : "🔇 Set Outro", callback_data: `outro_upload:${audio.name}` },
+      ],
     ];
+
+    if (audio.outro) {
+      buttons.push([{ text: "🗑️ Remove Outro", callback_data: `outro_delete:${audio.name}` }]);
+    }
 
     await bot.sendMessage(chatId, messageText, {
       parse_mode: "Markdown",
@@ -390,7 +399,103 @@ const handleAudioName = async (chatId, audioName) => {
 
 const handleCancelAudio = async (chatId) => {
   delete pendingAudioUploads[chatId];
+  delete pendingOutroUploads[chatId];
   await bot.sendMessage(chatId, "❌ Audio upload cancelled.");
+};
+
+const handleOutroUploadButton = async (chatId, audioName) => {
+  const audio = await Audio.findOne({ name: audioName });
+  if (!audio) {
+    await bot.sendMessage(chatId, `❌ Audio "${audioName}" not found.`);
+    return;
+  }
+
+  pendingOutroUploads[chatId] = { audioName, stage: "waiting_for_outro" };
+
+  await bot.sendMessage(
+    chatId,
+    `📤 Upload an outro audio for **${audioName}**.\n\n` +
+      "Plays immediately after caller presses 1, then call ends.\n" +
+      "Supported: MP3, WAV, OGG, FLAC, M4A",
+    {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [[{ text: "❌ Cancel", callback_data: `audio_detail:${audioName}` }]],
+      },
+    }
+  );
+};
+
+const handleOutroFile = async (chatId, fileId) => {
+  try {
+    const pending = pendingOutroUploads[chatId];
+    if (!pending || pending.stage !== "waiting_for_outro") return false;
+
+    const audioName = pending.audioName;
+    const fileInfo = await bot.getFile(fileId);
+    const downloadUrl = `https://api.telegram.org/file/bot${config.telegramBotToken}/${fileInfo.file_path}`;
+
+    const tempDir = "/tmp/asterisk-bot-audio";
+    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+
+    const tempPath = path.join(tempDir, `outro_${Date.now()}.tmp`);
+    const response = await axios.get(downloadUrl, { responseType: "arraybuffer", timeout: config.fileDownloadTimeout });
+    fs.writeFileSync(tempPath, response.data);
+
+    await bot.sendMessage(chatId, "⏳ Processing outro...");
+    await saveOutro(audioName, tempPath);
+    try { fs.unlinkSync(tempPath); } catch { /* ignore */ }
+
+    const allAudios = await getAudioList();
+    await updateExtensionsConf(allAudios);
+
+    delete pendingOutroUploads[chatId];
+
+    await bot.sendMessage(
+      chatId,
+      `✅ Outro saved for **${audioName}**!`,
+      {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🔊 Audio Details", callback_data: `audio_detail:${audioName}` }],
+            [{ text: "📋 View All", callback_data: "view_audios" }],
+          ],
+        },
+      }
+    );
+    return true;
+  } catch (err) {
+    console.error(`[audioHandler] Outro save error: ${err.message}`);
+    delete pendingOutroUploads[chatId];
+    await bot.sendMessage(chatId, `❌ Error: ${err.message}`);
+    return true;
+  }
+};
+
+const handleDeleteOutroButton = async (chatId, audioName) => {
+  try {
+    await deleteOutro(audioName);
+    const allAudios = await getAudioList();
+    await updateExtensionsConf(allAudios);
+
+    await bot.sendMessage(
+      chatId,
+      `✅ Outro removed for **${audioName}**.`,
+      {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🔊 Audio Details", callback_data: `audio_detail:${audioName}` }],
+            [{ text: "📋 View All", callback_data: "view_audios" }],
+          ],
+        },
+      }
+    );
+  } catch (err) {
+    console.error(`[audioHandler] Outro delete error: ${err.message}`);
+    await bot.sendMessage(chatId, `❌ Error: ${err.message}`);
+  }
 };
 
 const handlePageNavigation = async (chatId, page, data) => {
@@ -415,6 +520,10 @@ module.exports = {
   handleAudioFile,
   handleAudioName,
   handleCancelAudio,
+  handleOutroUploadButton,
+  handleOutroFile,
+  handleDeleteOutroButton,
   handlePageNavigation,
   getPendingUploads: () => pendingAudioUploads,
+  getPendingOutros: () => pendingOutroUploads,
 };

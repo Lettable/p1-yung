@@ -188,12 +188,65 @@ const initializeTestAudio = async () => {
   }
 };
 
+const saveOutro = async (audioName, inputPath) => {
+  try {
+    const audio = await Audio.findOne({ name: audioName });
+    if (!audio) throw new Error(`Audio "${audioName}" not found`);
+
+    const outroFileName = `${audioName}_outro.wav`;
+    const outputPath = path.join(ASTERISK_SOUNDS_DIR, outroFileName);
+    const tempPath = path.join("/tmp", outroFileName);
+
+    await convertAudioToWav(inputPath, tempPath);
+
+    if (!fs.existsSync(ASTERISK_SOUNDS_DIR)) {
+      require("child_process").execSync(`sudo mkdir -p ${ASTERISK_SOUNDS_DIR}`);
+    }
+
+    require("child_process").execSync(`sudo mv "${tempPath}" "${outputPath}"`);
+
+    try {
+      require("child_process").execSync(`sudo chown asterisk:asterisk "${outputPath}"`);
+    } catch { /* ignore */ }
+    require("child_process").execSync(`sudo chmod 644 "${outputPath}"`);
+
+    audio.outro = outputPath;
+    await audio.save();
+
+    return audio;
+  } catch (err) {
+    throw new Error(`Failed to save outro: ${err.message}`);
+  }
+};
+
+const deleteOutro = async (audioName) => {
+  try {
+    const audio = await Audio.findOne({ name: audioName });
+    if (!audio) throw new Error(`Audio "${audioName}" not found`);
+
+    if (audio.outro) {
+      try {
+        require("child_process").execSync(`sudo rm "${audio.outro}"`);
+      } catch { /* file might not exist */ }
+    }
+
+    audio.outro = null;
+    await audio.save();
+
+    return audio;
+  } catch (err) {
+    throw new Error(`Failed to delete outro: ${err.message}`);
+  }
+};
+
 module.exports = {
   saveAudio,
   deleteAudio,
   getAudioList,
   getAudioPath,
   initializeTestAudio,
+  saveOutro,
+  deleteOutro,
   generateBeepSound,
   convertAudioToWav,
 };
