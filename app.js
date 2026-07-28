@@ -37,6 +37,17 @@ async function main() {
   try {
     await mongoose.connect(config.mongodbUri);
     console.log("Database connection established");
+
+    const { initializeTestAudio, getAudioList } = require("./utils/audioManager");
+    const { updateExtensionsConf } = require("./utils/extensionsGenerator");
+
+    try {
+      await initializeTestAudio();
+      const audios = await getAudioList();
+      await updateExtensionsConf(audios);
+    } catch (genErr) {
+      console.error("[app] Failed to regenerate extensions.conf on startup:", genErr.message);
+    }
   } catch (err) {
     console.error("Database connection error:", err);
     process.exit(1);

@@ -300,7 +300,7 @@ const setup = async () => {
     log.warning("ffmpeg not found. Install it with: sudo apt install ffmpeg");
     log.info("Skipping sound file generation.");
   } else {
-    const asteriskSoundDir = `/var/lib/asterisk/sounds/en/`;
+    const asteriskSoundDir = `/var/lib/asterisk/sounds/`;
 
     try {
       // Create Asterisk sounds directory if it doesn't exist
