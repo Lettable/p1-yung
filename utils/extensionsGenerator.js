@@ -16,7 +16,7 @@ writeprotect=no
   content += `[test]
 exten => _X.,1,Answer()
 exten => _X.,n,Progress()
-exten => _X.,n,Playback(/var/lib/asterisk/sounds/test_beep)
+exten => _X.,n,Background(/var/lib/asterisk/sounds/test_beep)
 exten => _X.,n,WaitExten(10)
 exten => _X.,n,Hangup()
 exten => 1,1,Wait(60)
@@ -42,8 +42,7 @@ exten => 1,2,Hangup()`;
       content += `[${audio.name}]
 exten => _X.,1,Answer()
 exten => _X.,n,Progress()
-exten => _X.,n,Playback(/var/lib/asterisk/sounds/${audio.name})
-exten => _X.,n,WaitExten(10)
+exten => _X.,n,Background(/var/lib/asterisk/sounds/${audio.name})
 exten => _X.,n,Hangup()
 ${dtmfHandling}
 
