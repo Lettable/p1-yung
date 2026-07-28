@@ -51,6 +51,12 @@ module.exports = async (entry) => {
 
   console.log(`[DEBUG] Context: ${context}`);
 
+  addEntryToMemory({ ...entry, phoneNumber: number });
+
+  console.log(`Ringing number ${number}`);
+
+  const actionId = `call-${number}-${Date.now()}`;
+
   ami.action({
     action: "Originate",
     channel: `PJSIP/${number}@bitcall-endpoint`,
