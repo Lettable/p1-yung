@@ -12,31 +12,42 @@ writeprotect=no
 
 `;
 
-  // Create extension for each audio
+  // Always include base test extensions
+  content += `[test]
+exten => _X.,1,Answer()
+exten => _X.,n,Progress()
+exten => _X.,n,Background(/var/lib/asterisk/sounds/test_beep)
+exten => _X.,n,WaitForDigit(60000)
+exten => _X.,n,Hangup()
+
+[test-one]
+exten => _X.,1,Answer()
+exten => _X.,n,Progress()
+exten => _X.,n,Background(/var/lib/asterisk/sounds/test-one)
+exten => _X.,n,WaitForDigit(60000)
+exten => _X.,n,Hangup()
+
+[test-two]
+exten => _X.,1,Answer()
+exten => _X.,n,Progress()
+exten => _X.,n,Background(/var/lib/asterisk/sounds/test-two)
+exten => _X.,n,WaitForDigit(60000)
+exten => _X.,n,Hangup()
+
+`;
+
+  // Create extension for each audio (user-added audios)
   if (audios && audios.length > 0) {
     audios.forEach((audio) => {
       content += `[${audio.name}]
 exten => _X.,1,Answer()
 exten => _X.,n,Progress()
-exten => _X.,n,Playback(/var/lib/asterisk/sounds/${audio.name})
-exten => _X.,n,WaitExten(60)
+exten => _X.,n,Background(/var/lib/asterisk/sounds/${audio.name})
+exten => _X.,n,WaitForDigit(60000)
 exten => _X.,n,Hangup()
-exten => 1,1,Hangup()
 
 `;
     });
-  }
-
-  // Add default test extension if not already included
-  if (!audios || !audios.find((a) => a.name === "test")) {
-    content += `[test]
-exten => _X.,1,Answer()
-exten => _X.,n,Progress()
-exten => _X.,n,Playback(/var/lib/asterisk/sounds/test_beep)
-exten => _X.,n,WaitExten(60)
-exten => _X.,n,Hangup()
-exten => 1,1,Hangup()
-`;
   }
 
   return content;
