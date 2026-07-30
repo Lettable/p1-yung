@@ -3,15 +3,20 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
 
 export default function CallsPage() {
   const { data: session, status } = useSession();
   const [calls, setCalls] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCall, setSelectedCall] = useState<any>(null);
+  const [filter, setFilter] = useState('all');
 
   if (status === 'unauthenticated') redirect('/auth/login');
-  if (status === 'loading') return <div className="text-center py-12">Loading...</div>;
+  if (status === 'loading') return <div className="text-center py-12 text-textSecondary">Loading...</div>;
 
   useEffect(() => {
     const fetchCalls = async () => {
@@ -31,167 +36,178 @@ export default function CallsPage() {
     fetchCalls();
   }, []);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'answered':
-        return 'bg-accent/20 text-accent';
-      case 'completed':
-        return 'bg-accent/20 text-accent';
-      case 'failed':
-        return 'bg-danger/20 text-danger';
-      case 'ringing':
-        return 'bg-blue-500/20 text-blue-400';
-      default:
-        return 'bg-surface text-textSecondary';
-    }
+  const getStatusBadge = (status: string) => {
+    const badgeConfig: Record<string, { variant: 'success' | 'danger' | 'warning' | 'info' | 'default'; icon: string }> = {
+      answered: { variant: 'success', icon: '✅' },
+      completed: { variant: 'success', icon: '✓' },
+      failed: { variant: 'danger', icon: '❌' },
+      ringing: { variant: 'warning', icon: '📞' },
+      pending: { variant: 'info', icon: '⏳' },
+    };
+    const config = badgeConfig[status] || { variant: 'default' as const, icon: '❓' };
+    return <Badge variant={config.variant}>{config.icon} {status}</Badge>;
   };
 
+  const filteredCalls = filter === 'all' ? calls : calls.filter(c => c.status === filter);
+
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-white">Call History</h1>
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="space-y-2">
+        <h1 className="text-4xl font-black text-white">📞 Call History</h1>
+        <p className="text-textSecondary">View and manage all your call records</p>
+      </div>
 
       {/* Filters */}
-      <div className="card flex gap-4">
-        <input
-          type="text"
-          placeholder="Search by phone number..."
-          className="input flex-1"
-        />
-        <select className="input">
-          <option>All Status</option>
-          <option>Answered</option>
-          <option>Failed</option>
-          <option>Completed</option>
-        </select>
-        <input type="date" className="input" />
-      </div>
+      <Card variant="elevated">
+        <div className="flex flex-col md:flex-row gap-4">
+          <Input
+            placeholder="Search by phone number..."
+            className="flex-1"
+          />
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="px-4 py-2.5 bg-surface border border-border rounded-lg text-textPrimary focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
+          >
+            <option value="all">All Status</option>
+            <option value="answered">✅ Answered</option>
+            <option value="failed">❌ Failed</option>
+            <option value="completed">✓ Completed</option>
+            <option value="ringing">📞 Ringing</option>
+          </select>
+          <input type="date" className="px-4 py-2.5 bg-surface border border-border rounded-lg text-textPrimary focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer" />
+        </div>
+      </Card>
 
       {/* Calls Table */}
-      <div className="card overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border">
-              <th className="text-left py-3 px-4 text-textSecondary font-semibold">Time</th>
-              <th className="text-left py-3 px-4 text-textSecondary font-semibold">Phone</th>
-              <th className="text-left py-3 px-4 text-textSecondary font-semibold">Duration</th>
-              <th className="text-left py-3 px-4 text-textSecondary font-semibold">Status</th>
-              <th className="text-left py-3 px-4 text-textSecondary font-semibold">DTMF</th>
-              <th className="text-left py-3 px-4 text-textSecondary font-semibold">Cost</th>
-              <th className="text-left py-3 px-4 text-textSecondary font-semibold">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={7} className="py-8 text-center text-textSecondary">
-                  Loading calls...
-                </td>
+      <Card variant="elevated">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left py-3 px-4 text-textSecondary font-semibold">Time</th>
+                <th className="text-left py-3 px-4 text-textSecondary font-semibold">Phone</th>
+                <th className="text-left py-3 px-4 text-textSecondary font-semibold">Duration</th>
+                <th className="text-left py-3 px-4 text-textSecondary font-semibold">Status</th>
+                <th className="text-left py-3 px-4 text-textSecondary font-semibold">DTMF</th>
+                <th className="text-left py-3 px-4 text-textSecondary font-semibold">Cost</th>
+                <th className="text-left py-3 px-4 text-textSecondary font-semibold">Actions</th>
               </tr>
-            ) : calls.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="py-8 text-center text-textSecondary">
-                  No calls yet
-                </td>
-              </tr>
-            ) : (
-              calls.map((call) => (
-                <tr key={call._id} className="border-b border-border hover:bg-surface/50 transition">
-                  <td className="py-3 px-4 text-textPrimary">
-                    {new Date(call.startTime).toLocaleString()}
-                  </td>
-                  <td className="py-3 px-4 text-textPrimary font-mono">{call.phoneNumber}</td>
-                  <td className="py-3 px-4 text-textPrimary">{call.duration}s</td>
-                  <td className="py-3 px-4">
-                    <span className={`text-xs font-semibold py-1 px-2 rounded ${getStatusColor(call.status)}`}>
-                      {call.status}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-textPrimary">{call.dtmfPressed || '-'}</td>
-                  <td className="py-3 px-4 text-textPrimary">€{(call.cost / 100).toFixed(2)}</td>
-                  <td className="py-3 px-4">
-                    <button
-                      onClick={() => setSelectedCall(call)}
-                      className="text-accent hover:text-accent/80 text-sm"
-                    >
-                      Details
-                    </button>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-textSecondary">
+                    ⏳ Loading calls...
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ) : filteredCalls.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-textSecondary">
+                    No calls found
+                  </td>
+                </tr>
+              ) : (
+                filteredCalls.map((call) => (
+                  <tr key={call._id} className="border-b border-border hover:bg-surface/50 transition">
+                    <td className="py-3 px-4 text-textPrimary text-xs">
+                      {new Date(call.startTime).toLocaleDateString()}
+                    </td>
+                    <td className="py-3 px-4 text-textPrimary font-mono">{call.phoneNumber}</td>
+                    <td className="py-3 px-4 text-textPrimary font-semibold">{call.duration}s</td>
+                    <td className="py-3 px-4">
+                      {getStatusBadge(call.status)}
+                    </td>
+                    <td className="py-3 px-4 text-textPrimary font-mono">{call.dtmfPressed || '-'}</td>
+                    <td className="py-3 px-4 text-textPrimary font-semibold">€{(call.cost / 100).toFixed(2)}</td>
+                    <td className="py-3 px-4">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedCall(call)}
+                      >
+                        👁 View
+                      </Button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
       {/* Call Details Modal */}
       {selectedCall && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="card max-w-md w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-white">Call Details</h2>
-              <button
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <Card variant="elevated" className="max-w-md w-full">
+            <div className="space-y-6">
+              <div className="flex justify-between items-start">
+                <h2 className="text-2xl font-bold text-white">📞 Call Details</h2>
+                <button
+                  onClick={() => setSelectedCall(null)}
+                  className="text-textSecondary hover:text-textPrimary text-3xl leading-none hover:scale-125 transition"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="bg-surface/50 rounded p-3">
+                  <div className="text-xs text-textSecondary mb-1">Phone Number</div>
+                  <div className="text-white font-mono text-lg">{selectedCall.phoneNumber}</div>
+                </div>
+
+                <div className="flex gap-3">
+                  {getStatusBadge(selectedCall.status)}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-surface/50 rounded p-3">
+                    <div className="text-xs text-textSecondary mb-1">Duration</div>
+                    <div className="text-white font-bold text-xl">{selectedCall.duration}s</div>
+                  </div>
+                  <div className="bg-surface/50 rounded p-3">
+                    <div className="text-xs text-textSecondary mb-1">Cost</div>
+                    <div className="text-accent font-bold text-xl">€{(selectedCall.cost / 100).toFixed(2)}</div>
+                  </div>
+                </div>
+
+                {selectedCall.dtmfPressed && (
+                  <div className="bg-accent/10 border border-accent rounded p-3">
+                    <div className="text-xs text-accent mb-1">DTMF Pressed</div>
+                    <div className="text-white font-mono text-2xl">{selectedCall.dtmfPressed}</div>
+                  </div>
+                )}
+
+                <div className="bg-surface/50 rounded p-3">
+                  <div className="text-xs text-textSecondary mb-1">Started</div>
+                  <div className="text-textPrimary text-sm">
+                    {new Date(selectedCall.startTime).toLocaleString()}
+                  </div>
+                </div>
+
+                {selectedCall.recordingUrl && (
+                  <div className="bg-surface/50 rounded p-3">
+                    <div className="text-xs text-textSecondary mb-2">🎙️ Recording</div>
+                    <audio controls className="w-full rounded">
+                      <source src={selectedCall.recordingUrl} type="audio/wav" />
+                    </audio>
+                  </div>
+                )}
+              </div>
+
+              <Button
+                variant="secondary"
+                size="lg"
                 onClick={() => setSelectedCall(null)}
-                className="text-textSecondary hover:text-textPrimary text-2xl leading-none"
+                className="w-full"
               >
-                ×
-              </button>
+                Close
+              </Button>
             </div>
-
-            <div className="space-y-3 text-sm">
-              <div>
-                <div className="text-textSecondary">Phone</div>
-                <div className="text-white font-mono text-lg">{selectedCall.phoneNumber}</div>
-              </div>
-
-              <div>
-                <div className="text-textSecondary">Status</div>
-                <div className={`text-white font-semibold ${getStatusColor(selectedCall.status)}`}>
-                  {selectedCall.status}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-textSecondary">Duration</div>
-                  <div className="text-white font-semibold">{selectedCall.duration}s</div>
-                </div>
-                <div>
-                  <div className="text-textSecondary">Cost</div>
-                  <div className="text-white font-semibold">€{(selectedCall.cost / 100).toFixed(2)}</div>
-                </div>
-              </div>
-
-              {selectedCall.dtmfPressed && (
-                <div>
-                  <div className="text-textSecondary">DTMF Pressed</div>
-                  <div className="text-white font-mono text-lg">{selectedCall.dtmfPressed}</div>
-                </div>
-              )}
-
-              <div>
-                <div className="text-textSecondary">Started</div>
-                <div className="text-white text-xs">
-                  {new Date(selectedCall.startTime).toLocaleString()}
-                </div>
-              </div>
-
-              {selectedCall.recordingUrl && (
-                <div>
-                  <div className="text-textSecondary mb-2">Recording</div>
-                  <audio controls className="w-full">
-                    <source src={selectedCall.recordingUrl} type="audio/wav" />
-                  </audio>
-                </div>
-              )}
-            </div>
-
-            <button
-              onClick={() => setSelectedCall(null)}
-              className="btn-secondary w-full mt-4"
-            >
-              Close
-            </button>
-          </div>
+          </Card>
         </div>
       )}
     </div>
