@@ -29,11 +29,11 @@ const callCampaignSchema = new Schema<ICallCampaign>(
     ],
     audioScript: {
       type: String,
-      required: true,
+      default: 'default_script',
     },
     greetingAudio: {
       type: String,
-      required: true,
+      default: 'default_greeting',
     },
     totalCalls: {
       type: Number,
